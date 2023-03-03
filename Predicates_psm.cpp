@@ -108,7 +108,9 @@ namespace GEO {
             ::memcpy(to, from, size);
         }
 
-	inline pointer function_pointer_to_generic_pointer(function_pointer fptr) {
+	inline pointer function_pointer_to_generic_pointer(
+            function_pointer fptr
+        ) {
 	    // I know this is ugly, but I did not find a simpler warning-free
 	    // way that is portable between all compilers.
 	    pointer result = nullptr;
@@ -116,7 +118,9 @@ namespace GEO {
 	    return result;
 	}
 
-	inline function_pointer generic_pointer_to_function_pointer(pointer ptr) {
+	inline function_pointer generic_pointer_to_function_pointer(
+            pointer ptr
+        ) {
 	    // I know this is ugly, but I did not find a simpler warning-free
 	    // way that is portable between all compilers.
 	    function_pointer result = nullptr;
@@ -1308,17 +1312,19 @@ namespace GEO {
 
     
 
-    inline double det2x2(
-        double a11, double a12,                    
-        double a21, double a22
+    template <class T>
+    inline T det2x2(
+        const T& a11, const T& a12,                    
+        const T& a21, const T& a22
     ) {                                 
         return a11*a22-a12*a21 ;
     }
 
-    inline double det3x3(
-        double a11, double a12, double a13,                
-        double a21, double a22, double a23,                
-        double a31, double a32, double a33
+    template <class T>    
+    inline T det3x3(
+        const T& a11, const T& a12, const T& a13,                
+        const T& a21, const T& a22, const T& a23,                
+        const T& a31, const T& a32, const T& a33
     ) {
     return
          a11*det2x2(a22,a23,a32,a33)   
@@ -1327,23 +1333,24 @@ namespace GEO {
     }   
 
 
-    inline double det4x4(
-        double a11, double a12, double a13, double a14,
-        double a21, double a22, double a23, double a24,               
-        double a31, double a32, double a33, double a34,  
-        double a41, double a42, double a43, double a44  
+    template <class T>    
+    inline T det4x4(
+        const T& a11, const T& a12, const T& a13, const T& a14,
+        const T& a21, const T& a22, const T& a23, const T& a24,               
+        const T& a31, const T& a32, const T& a33, const T& a34,  
+        const T& a41, const T& a42, const T& a43, const T& a44  
     ) {
-        double m12 = a21*a12 - a11*a22;
-        double m13 = a31*a12 - a11*a32;
-        double m14 = a41*a12 - a11*a42;
-        double m23 = a31*a22 - a21*a32;
-        double m24 = a41*a22 - a21*a42;
-        double m34 = a41*a32 - a31*a42;
+        T m12 = a21*a12 - a11*a22;
+        T m13 = a31*a12 - a11*a32;
+        T m14 = a41*a12 - a11*a42;
+        T m23 = a31*a22 - a21*a32;
+        T m24 = a41*a22 - a21*a42;
+        T m34 = a41*a32 - a31*a42;
 
-        double m123 = m23*a13 - m13*a23 + m12*a33;
-        double m124 = m24*a13 - m14*a23 + m12*a43;
-        double m134 = m34*a13 - m14*a33 + m13*a43;
-        double m234 = m34*a23 - m24*a33 + m23*a43;
+        T m123 = m23*a13 - m13*a23 + m12*a33;
+        T m124 = m24*a13 - m14*a23 + m12*a43;
+        T m134 = m34*a13 - m14*a33 + m13*a43;
+        T m234 = m34*a23 - m24*a33 + m23*a43;
         
         return (m234*a14 - m134*a24 + m124*a34 - m123*a44);
     }   
@@ -1667,7 +1674,9 @@ namespace GEO {
 #define GEOGRAM_NUMERICS_MULTI_PRECISION
 
 #include <iostream>
+#include <sstream>
 #include <new>
+#include <math.h>
 
 
 namespace GEO {
@@ -2078,13 +2087,40 @@ namespace GEO {
             return geo_sgn(x_[length() - 1]);
         }
 
-        std::ostream& show(std::ostream& os) const {
-            for(index_t i = 0; i < length(); ++i) {
-                os << i << ':' << x_[i] << ' ';
-            }
-            return os << std::endl;
+        bool is_same_as(const expansion& rhs) const;
+
+        bool is_same_as(double rhs) const;
+
+
+        Sign compare(const expansion& rhs) const;
+
+        Sign compare(double rhs) const;
+
+        bool equals(const expansion& rhs) const {
+            return (compare(rhs) == ZERO);
         }
 
+        bool equals(double rhs) const {
+            return (compare(rhs) == ZERO);            
+        }
+        
+        std::ostream& show(std::ostream& out) const {
+            out << "expansion[" << length() << "] = [";
+            for(index_t i=0; i<length(); ++i) {
+                out << (*this)[i] << " ";
+            }
+            out << "]";
+            return out;
+        }
+
+        std::string to_string() const {
+            std::ostringstream out;
+            show(out);
+            return out.str();
+        }
+
+        void optimize();
+        
     protected:
         static index_t sub_product_capacity(
             index_t a_length, index_t b_length
@@ -2216,6 +2252,25 @@ namespace GEO {
     );
     
     
+
+    void GEOGRAM_API grow_expansion_zeroelim(
+        const expansion& e, double b, expansion& h
+    );
+
+    void GEOGRAM_API scale_expansion_zeroelim(
+        const expansion& e, double b, expansion& h
+    );    
+
+    void GEOGRAM_API fast_expansion_sum_zeroelim(
+        const expansion& e, const expansion& f, expansion& h
+    );
+
+
+    void GEOGRAM_API fast_expansion_diff_zeroelim(
+        const expansion& e, const expansion& f, expansion& h
+    );
+    
+    
 }
 
 #endif
@@ -2256,8 +2311,9 @@ namespace {
     
 
     class Pools {
-    public:
 
+    public:
+        
         Pools() : pools_(1024,nullptr) {
             chunks_.reserve(1024);
         }
@@ -2271,12 +2327,12 @@ namespace {
         void* malloc(size_t size) {
             if(size >= pools_.size()) {
                 return ::malloc(size);
-            }
+            } 
             if(pools_[size] == nullptr) {
                 new_chunk(size);
             }
-            void* result = pools_[size];
-            pools_[size] = *static_cast<void**>(pools_[size]);
+            Memory::pointer result = pools_[size];
+            pools_[size] = next(pools_[size]);
             return result;
         }
 
@@ -2285,31 +2341,54 @@ namespace {
                 ::free(ptr);
                 return;
             }
-            *static_cast<void**>(ptr) = pools_[size];
-            pools_[size] = ptr;
+            set_next(Memory::pointer(ptr), pools_[size]);
+            pools_[size] = Memory::pointer(ptr);
         }
 
         
     protected:
-        static const index_t POOL_CHUNK_SIZE = 512;
+        static const index_t NB_ITEMS_PER_CHUNK = 512;
         
-        void new_chunk(size_t size_in) {
-            size_t size = (size_in / 8 + 1)*8; // Align memory.
-            Memory::pointer chunk = new Memory::byte[size * POOL_CHUNK_SIZE];
-            for(index_t i=0; i<POOL_CHUNK_SIZE-1; ++i) {
-                Memory::pointer cur = chunk + size * i;
-                Memory::pointer next = cur + size;
-                *reinterpret_cast<void**>(cur) = next;
+        void new_chunk(size_t item_size) {
+            // Allocate chunk
+            Memory::pointer chunk =
+                new Memory::byte[item_size * NB_ITEMS_PER_CHUNK];
+            // Chain items in chunk
+            for(index_t i=0; i<NB_ITEMS_PER_CHUNK-1; ++i) {
+                Memory::pointer cur_item  = item(chunk, item_size, i);
+                Memory::pointer next_item = item(chunk, item_size, i+1);
+                set_next(cur_item, next_item);
             }
-            *reinterpret_cast<void**>(chunk + (size-1)*POOL_CHUNK_SIZE) =
-		pools_[size_in];
-            pools_[size_in] = chunk;
+            // Last item's next is pool's first
+            set_next(
+                item(chunk, item_size,NB_ITEMS_PER_CHUNK-1),
+                pools_[item_size]
+            );
+            // Set pool's first to first in chunk
+            pools_[item_size] = chunk;
             chunks_.push_back(chunk);
         }
 
-        
     private:
-        std::vector<void*> pools_;
+
+        Memory::pointer next(Memory::pointer item) const {
+            return *reinterpret_cast<Memory::pointer*>(item);
+        }
+
+        void set_next(
+            Memory::pointer item, Memory::pointer next
+        ) const {
+            *reinterpret_cast<Memory::pointer*>(item) = next;
+        }
+
+        Memory::pointer item(
+            Memory::pointer chunk, size_t item_size, index_t index
+        ) const {
+            geo_debug_assert(index < NB_ITEMS_PER_CHUNK);
+            return chunk + (item_size * size_t(index));
+        }
+        
+        std::vector<Memory::pointer> pools_;
         
         std::vector<Memory::pointer> chunks_;
 
@@ -2463,6 +2542,9 @@ namespace {
         two_sum(_m, _k, x[7], x[6]);
 #endif
     }
+}
+
+namespace GEO {
 
     void grow_expansion_zeroelim(
         const expansion& e, double b, expansion& h
@@ -3000,6 +3082,46 @@ namespace GEO {
     
     
 
+    bool expansion::is_same_as(const expansion& rhs) const {
+        if(length() != rhs.length()) {
+            return false;
+        }
+        for(index_t i=0; i<length(); ++i) {
+            if(x_[i] != rhs.x_[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool expansion::is_same_as(double rhs) const {
+        if(length() != 1) {
+            return false;
+        }
+        return (x_[0] == rhs);
+    }
+
+    Sign expansion::compare(const expansion& rhs) const {
+        if(is_same_as(rhs)) {
+            return ZERO;
+        }
+        const expansion& d = expansion_diff(*this, rhs);
+        return d.sign();
+    }
+    
+    Sign expansion::compare(double rhs) const {
+        if(rhs == 0.0) {
+            return sign();
+        }
+        if(is_same_as(rhs)) {
+            return ZERO;
+        }
+        const expansion& d = expansion_diff(*this, rhs);
+        return d.sign();
+    }
+    
+    
+    
     Sign sign_of_expansion_determinant(
         const expansion& a00,const expansion& a01,  
         const expansion& a10,const expansion& a11
@@ -3090,6 +3212,12 @@ namespace GEO {
         return result.sign();
     }
     
+    
+
+    void expansion::optimize() {
+        grow_expansion_zeroelim(*this, 0.0, *this);
+    }
+
     
     
 }
@@ -13418,8 +13546,8 @@ namespace GEO {
 	) {
 	    Sign result = Sign(det_3d_filter(p0, p1, p2));
 	    if(result == 0) {
-		result = dot_3d_exact(p0, p1, p2);
-	    }
+                result = dot_3d_exact(p0, p1, p2);
+            }
 	    return result;
 	}
 

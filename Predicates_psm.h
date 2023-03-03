@@ -356,14 +356,7 @@ namespace GEO {
 #include <float.h>
 #include <limits.h>
 #include <algorithm> // for std::min / std::max
-
-// Visual C++ ver. < 2010 does not have C99 stdint.h,
-// using a fallback portable one.
-#if defined(GEO_OS_WINDOWS) && (_MSC_VER < 1600)
-#else
 #include <stdint.h>
-#endif
-
 #include <limits>
 
 #ifndef M_PI
@@ -729,7 +722,6 @@ namespace GEO {
         }
 #endif
 
-	
         Sign GEOGRAM_API orient_2dlifted_SOS(
             const double* p0, const double* p1,
             const double* p2, const double* p3, 
@@ -789,6 +781,21 @@ namespace GEO {
 	    const double* p0, const double* p1, const double* p2
 	);
 
+#ifndef GEOGRAM_PSM
+
+	inline bool aligned_3d(
+	    const vec3& p0, const vec3& p1, const vec3& p2
+	) {
+            return aligned_3d(p0.data(), p1.data(), p2.data());
+        }
+        
+	inline Sign dot_3d(
+	    const vec3& p0, const vec3& p1, const vec3& p2
+	) {
+            return dot_3d(p0.data(), p1.data(), p2.data());
+        }
+#endif
+	
 	Sign GEOGRAM_API dot_compare_3d(
 	    const double* v0, const double* v1, const double* v2
 	);
