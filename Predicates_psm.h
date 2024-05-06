@@ -199,6 +199,7 @@ namespace GEO {
 // The following works on GCC and ICC
 #if defined(__x86_64)
 #  define GEO_ARCH_64
+#  define GEO_PROCESSOR_X86
 #else
 #  define GEO_ARCH_32
 #endif
@@ -208,6 +209,7 @@ namespace GEO {
 #elif defined(_WIN32) || defined(_WIN64)
 
 #define GEO_OS_WINDOWS
+#define GEO_PROCESSOR_X86
 
 #if defined(_OPENMP)
 #  define GEO_OPENMP
@@ -244,7 +246,7 @@ namespace GEO {
 #  error "Unsupported compiler"
 #endif
 
-#if defined(__x86_64) || defined(__ppc64__) || defined(__arm64__) || defined(__aarch64__)
+#if defined(__x86_64) || defined(__ppc64__) || defined(__arm64__) || defined(__aarch64__) || (defined(__riscv) && __riscv_xlen == 64)
 #  define GEO_ARCH_64
 #else
 #  define GEO_ARCH_32
@@ -366,6 +368,27 @@ namespace GEO {
 
 namespace GEO {
 
+    enum Sign {
+        
+        NEGATIVE = -1,
+        
+        ZERO = 0,
+        
+        POSITIVE = 1
+    };
+
+    template <class T>
+    inline Sign geo_sgn(const T& x) {
+        return (x > 0) ? POSITIVE : (
+            (x < 0) ? NEGATIVE : ZERO
+        );
+    }
+
+    template <class T>
+    inline Sign geo_cmp(const T& a, const T& b) {
+        return Sign((a > b) * POSITIVE + (a < b) * NEGATIVE);
+    }
+    
     namespace Numeric {
 
         
@@ -451,25 +474,26 @@ namespace GEO {
         struct Limits : 
             LimitsHelper<T, std::numeric_limits<T>::is_specialized> {
         };
+
+        template <class T> inline void optimize_number_representation(T& x) {
+            geo_argused(x);
+        }
+
+        template <class T> inline Sign ratio_compare(
+            const T& a_num, const T& a_denom, const T& b_num, const T& b_denom
+        ) {
+            if(a_denom == b_denom) {
+                return Sign(geo_cmp(a_num,b_num)*geo_sgn(a_denom));
+            }
+            return Sign(
+                geo_cmp(a_num*b_denom, b_num*a_denom) *
+                geo_sgn(a_denom) * geo_sgn(b_denom)
+            );
+        }
     }
 
     
 
-    enum Sign {
-        
-        NEGATIVE = -1,
-        
-        ZERO = 0,
-        
-        POSITIVE = 1
-    };
-
-    template <class T>
-    inline Sign geo_sgn(const T& x) {
-        return (x > 0) ? POSITIVE : (
-            (x < 0) ? NEGATIVE : ZERO
-        );
-    }
 
     template <class T>
     inline T geo_sqr(T x) {
@@ -506,6 +530,12 @@ namespace GEO {
     inline double round(double x) {
 	return ((x - floor(x)) > 0.5 ? ceil(x) : floor(x));
     }
+
+    
+    
+    static constexpr index_t NO_INDEX = index_t(-1);
+    
+    
 }
 
 #endif
@@ -585,32 +615,464 @@ namespace GEO {
 #define FPG_UNCERTAIN_VALUE 0
 #endif
 
+#define GEOGRAM_WITH_PDEL
 
+#endif
+
+/******* extracted from ../basic/thread_sync.h *******/
 
 #ifndef GEOGRAM_BASIC_THREAD_SYNC
-#define GEOGRAM_SPINLOCK_INIT 0
+#define GEOGRAM_BASIC_THREAD_SYNC
+
+
+#include <vector>
+#include <atomic>
+
+// On Windows/MSCV, we need to use a special implementation
+// of spinlocks because std::atomic_flag in MSVC's stl does
+// not fully implement the norm (lacks a constructor).
+#ifdef GEO_OS_WINDOWS
+#include <windows.h>
+#include <intrin.h>
+#pragma intrinsic(_InterlockedCompareExchange16)
+#pragma intrinsic(_WriteBarrier)
+#endif
+
+// On MacOS, I get many warnings with atomic_flag initialization,
+// such as std::atomic_flag f = ATOMIC_FLAG_INIT
+#if defined(__clang__)
+#pragma GCC diagnostic ignored "-Wbraced-scalar-init"
+#endif
+
+inline void geo_pause() {
+#ifdef GEO_OS_WINDOWS
+    YieldProcessor();
+#else
+#  ifdef GEO_PROCESSOR_X86
+#    ifdef __ICC
+    _mm_pause();
+#    else
+    __builtin_ia32_pause();
+#    endif
+#  endif
+#endif
+}
+
+
+
+#ifdef GEO_OS_WINDOWS
+
+// Windows-specific spinlock implementation.
+// I'd have prefered to use std::atomic_flag for everybody,
+// unfortunately atomic_flag's constructor is not implemented in MSCV's stl,
+// so we reimplement them using atomic compare-exchange functions...
 
 namespace GEO {
     namespace Process {
-    
-        typedef int spinlock;
         
-        inline void acquire_spinlock(spinlock& x) {
-            // Not implemented yet for PSMs
-            geo_argused(x);
-            geo_assert_not_reached;
+        typedef short spinlock;
+
+        
+#       define GEOGRAM_SPINLOCK_INIT 0
+        inline void acquire_spinlock(volatile spinlock& x) {
+            while(_InterlockedCompareExchange16(&x, 1, 0) == 1) {
+                // Intel recommends to have a PAUSE asm instruction
+                // in the spinlock loop. Under MSVC/Windows,
+                // YieldProcessor() is a macro that calls the
+                // (undocumented) _mm_pause() intrinsic function
+                // that generates a PAUSE opcode.
+                YieldProcessor();
+            }
+            // We do not need _ReadBarrier() here since
+            // _InterlockedCompareExchange16
+            // "acts as a full barrier in VC2005" according to the doc
         }
-    
-        inline void release_spinlock(spinlock& x) {
-            // Not implemented yet for PSMs
-            geo_argused(x); 
-            geo_assert_not_reached;       
+
+        inline void release_spinlock(volatile spinlock& x) {
+            _WriteBarrier(); // prevents compiler reordering
+            x = 0;
         }
+        
+    }
+}
+
+
+
+#else
+
+namespace GEO {
+    namespace Process {
+
+        
+        // Note: C++20 does not need it anymore, in C++20
+        // std::atomic_flag's constructor initializes it,
+        // we keep it because
+        // - we are using C++17
+        // - the Windows implementation that uses integers rather than
+        //   std::atomic_flag needs an initialization value.
+#define GEOGRAM_SPINLOCK_INIT ATOMIC_FLAG_INIT 
+
+        typedef std::atomic_flag spinlock;
+
+        inline void acquire_spinlock(volatile spinlock& x) {
+            for (;;) {
+                if (!x.test_and_set(std::memory_order_acquire)) {
+                    break;
+                }
+// If compiling in C++20 we can be slightly more efficient when spinning
+// (avoid unrequired atomic operations, just "peek" the flag)
+#if defined(__cpp_lib_atomic_flag_test)                
+                while (x.test(std::memory_order_relaxed)) 
+#endif
+                    geo_pause();
+            }            
+        }
+
+        inline void release_spinlock(volatile spinlock& x) {
+            x.clear(std::memory_order_release); 
+        }
+        
     }
 }
 #endif
 
-#define GEOGRAM_WITH_PDEL
+
+
+namespace GEO {
+    namespace Process {
+    
+        class BasicSpinLockArray {
+        public:
+            BasicSpinLockArray() : spinlocks_(nullptr), size_(0) {
+            }
+
+            BasicSpinLockArray(index_t size_in) : spinlocks_(nullptr), size_(0) {
+                resize(size_in);
+            }
+
+            BasicSpinLockArray(const BasicSpinLockArray& rhs) = delete;
+
+            BasicSpinLockArray& operator=(
+                const BasicSpinLockArray& rhs
+            ) = delete;
+            
+            void resize(index_t size_in) {
+                delete[] spinlocks_;
+                spinlocks_ = new spinlock[size_in];
+                size_ = size_in;
+                // Need to initialize the spinlocks to false (dirty !)
+                // (maybe use placement new on each item..., to be tested)
+                for(index_t i=0; i<size_; ++i) {
+                    Process::release_spinlock(spinlocks_[i]);
+                }
+            }
+
+            void clear() {
+                delete[] spinlocks_;
+                spinlocks_ = nullptr;
+            }
+
+            index_t size() const {
+                return size_;
+            }
+
+            void acquire_spinlock(index_t i) {
+                geo_debug_assert(i < size());
+                GEO::Process::acquire_spinlock(spinlocks_[i]);
+            }
+
+            void release_spinlock(index_t i) {
+                geo_debug_assert(i < size());
+                GEO::Process::release_spinlock(spinlocks_[i]);
+            }
+
+        private:
+            // Cannot use a std::vector because std::atomic_flag does not
+            // have copy ctor nor assignment operator.
+            spinlock* spinlocks_;
+            index_t size_;
+        };
+    }
+}
+
+
+
+namespace GEO {
+    namespace Process {
+
+        class CompactSpinLockArray {
+        public:
+            CompactSpinLockArray() : spinlocks_(nullptr), size_(0) {
+            }
+
+            CompactSpinLockArray(index_t size_in) : spinlocks_(nullptr),size_(0){
+                resize(size_in);
+            }
+
+            ~CompactSpinLockArray() {
+                clear();
+            }
+            
+            CompactSpinLockArray(const CompactSpinLockArray& rhs) = delete;
+
+            CompactSpinLockArray& operator=(
+                const CompactSpinLockArray& rhs
+            ) = delete;
+            
+            void resize(index_t size_in) {
+                if(size_ != size_in) {
+                    size_ = size_in;
+                    index_t nb_words = (size_ >> 5) + 1;
+                    delete[] spinlocks_;
+                    spinlocks_ = new std::atomic<uint32_t>[nb_words];
+                    for(index_t i=0; i<nb_words; ++i) {
+                        // Note: std::atomic_init() is deprecated in C++20
+                        // that can initialize std::atomic through its
+                        // non-default constructor. We'll need to do something
+                        // else when we'll switch to C++20 (placement new...)
+                        std::atomic_init(&spinlocks_[i],0u);
+                    }
+                }
+// Test at compile time that we are using atomic uint32_t operations (and not
+// using an additional lock which would be catastrophic in terms of performance)
+#ifdef __cpp_lib_atomic_is_always_lock_free                
+                static_assert(std::atomic<uint32_t>::is_always_lock_free);
+#else
+// If we cannot test that at compile time, we test that at runtime in debug
+// mode (so that we will be notified in the non-regression test if one of
+// the platforms has the problem, which is very unlikely though...)
+                geo_debug_assert(size_ == 0 || spinlocks_[0].is_lock_free());
+#endif                
+            }
+
+            index_t size() const {
+                return size_;
+            }
+
+            void clear() {
+                delete[] spinlocks_;
+                size_ = 0;
+            }
+
+            void acquire_spinlock(index_t i) {
+                geo_debug_assert(i < size());
+                index_t  w = i >> 5;
+                uint32_t b = uint32_t(i & 31);
+                uint32_t mask = (1u << b);
+                while(
+                    (spinlocks_[w].fetch_or(
+                        mask, std::memory_order_acquire
+                    ) & mask) != 0
+                ) {
+                    geo_pause();
+                }
+            }
+
+            void release_spinlock(index_t i) {
+                geo_debug_assert(i < size());
+                index_t  w = i >> 5;
+                uint32_t b = uint32_t(i & 31);
+                uint32_t mask = ~(1u << b);
+                spinlocks_[w].fetch_and(mask, std::memory_order_release);
+            }
+
+        private:
+            // Cannot use a std::vector because std::atomic<> does not
+            // have copy ctor nor assignment operator.
+            std::atomic<uint32_t>* spinlocks_;
+            index_t size_;
+        };
+        
+    }
+}
+
+
+
+namespace GEO {
+    namespace Process {
+        typedef CompactSpinLockArray SpinLockArray;
+    }
+}
+
+
+
+#endif
+
+
+/******* extracted from ../basic/determinant.h *******/
+
+#ifndef GEOGRAM_BASIC_DETERMINANT
+#define GEOGRAM_BASIC_DETERMINANT
+
+
+
+namespace GEO {
+
+    
+
+    template <class T>
+    inline T det2x2(
+        const T& a11, const T& a12,                    
+        const T& a21, const T& a22
+    ) {                                 
+        return a11*a22-a12*a21 ;
+    }
+
+    template <class T>    
+    inline T det3x3(
+        const T& a11, const T& a12, const T& a13,                
+        const T& a21, const T& a22, const T& a23,                
+        const T& a31, const T& a32, const T& a33
+    ) {
+    return
+         a11*det2x2(a22,a23,a32,a33)   
+        -a21*det2x2(a12,a13,a32,a33)   
+        +a31*det2x2(a12,a13,a22,a23);
+    }   
+
+
+    template <class T>    
+    inline T det4x4(
+        const T& a11, const T& a12, const T& a13, const T& a14,
+        const T& a21, const T& a22, const T& a23, const T& a24,               
+        const T& a31, const T& a32, const T& a33, const T& a34,  
+        const T& a41, const T& a42, const T& a43, const T& a44  
+    ) {
+        T m12 = a21*a12 - a11*a22;
+        T m13 = a31*a12 - a11*a32;
+        T m14 = a41*a12 - a11*a42;
+        T m23 = a31*a22 - a21*a32;
+        T m24 = a41*a22 - a21*a42;
+        T m34 = a41*a32 - a31*a42;
+
+        T m123 = m23*a13 - m13*a23 + m12*a33;
+        T m124 = m24*a13 - m14*a23 + m12*a43;
+        T m134 = m34*a13 - m14*a33 + m13*a43;
+        T m234 = m34*a23 - m24*a33 + m23*a43;
+        
+        return (m234*a14 - m134*a24 + m124*a34 - m123*a44);
+    }   
+}
+
+#endif
+
+/******* extracted from PCK.h *******/
+
+#ifndef GEOGRAM_NUMERICS_PCK
+#define GEOGRAM_NUMERICS_PCK
+
+#include <functional>
+#include <algorithm>
+#include <atomic>
+
+
+// Uncomment to get full reporting on predicate statistics
+// (but has a non-negligible impact on performance)
+// For instance, Early Universe Reconstruction with 2M points:
+// with PCK_STATS: 6'36   without PCK_STATS: 3'38
+
+//#define PCK_STATS
+
+namespace GEO {
+
+    namespace PCK {
+
+        
+#ifdef PCK_STATS
+        class GEOGRAM_API PredicateStats {
+        public:
+            PredicateStats(const char* name);
+            void log_invoke() {
+                ++invoke_count_;
+            }
+            void log_exact() {
+                ++exact_count_;
+            }
+            void log_SOS() {
+                ++SOS_count_;
+            }
+            void show_stats();
+            static void show_all_stats();
+        private:
+            static PredicateStats* first_;
+            PredicateStats* next_;
+            const char* name_;
+            std::atomic<Numeric::int64> invoke_count_;
+            std::atomic<Numeric::int64> exact_count_;
+            std::atomic<Numeric::int64> SOS_count_;
+        };
+#else
+        class PredicateStats {
+        public:
+            PredicateStats(const char* name) {
+                geo_argused(name);
+            }
+            void log_invoke() {
+            }
+            void log_exact() {
+            }
+            void log_SOS() {
+            }
+            static void show_all_stats() {
+                Logger::out("Stats") << "Compiled without PCK_STAT (no stats)"
+                                     << std::endl;
+            }
+        };
+#endif
+
+        
+#define SOS_result(x) [&]()->Sign { return Sign(x); }
+
+        template <
+            class POINT, class COMPARE,
+            class FUNC1, class FUNC2, class FUNC3, class FUNC4
+            > inline Sign SOS(
+                COMPARE compare,
+                const POINT& p1, FUNC1 sos_p1,
+                const POINT& p2, FUNC2 sos_p2,
+                const POINT& p3, FUNC3 sos_p3,
+                const POINT& p4, FUNC4 sos_p4
+            ) {
+            static constexpr int N = 4;
+            Sign result = ZERO;
+            const POINT* p[N] = {&p1, &p2, &p3, &p4};
+            std::sort(
+                p, p+N,
+                [compare](const POINT* A, const POINT* B)->bool{
+                    return compare(*A,*B);
+                }
+            );
+            for(int i=0; i<N; ++i) {
+                if(p[i] == &p1) {
+                    result = sos_p1();
+                    if(result != ZERO) {
+                        return result;
+                    }
+                }
+                if(p[i] == &p2) {
+                    result = sos_p2();
+                    if(result != ZERO) {
+                        return result;
+                    }
+                }
+                if(p[i] == &p3) {
+                    result = sos_p3();
+                    if(result != ZERO) {
+                        return result;
+                    }
+                }
+                if(p[i] == &p4) {
+                    result = sos_p4();
+                    if(result != ZERO) {
+                        return result;
+                    }
+                }
+            }
+            geo_assert_not_reached;
+        }
+
+    }
+}
 
 #endif
 
@@ -621,9 +1083,6 @@ namespace GEO {
 
 
 
-// Uncomment to get full reporting on predicate statistics
-// (but has a non-negligible impact on performance)
-// #define PCK_STATS
 
 namespace GEO {
 

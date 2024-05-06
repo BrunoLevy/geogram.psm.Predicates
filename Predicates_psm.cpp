@@ -78,6 +78,19 @@
 
 #endif
 
+// Stack size depending on OS:
+// Linux: 10 Mb
+// Windows: 1 Mb
+// Mac OSX: 512 Kb
+// GEO_HAS_BIG_STACK is defined under Linux
+// and lets some of the functions that
+// manipulate exact precision numbers
+// allocate temporaries on the stack.
+
+#ifdef GEO_OS_LINUX
+#define GEO_HAS_BIG_STACK
+#endif
+
 
 namespace GEO {
 
@@ -485,6 +498,7 @@ namespace GEO {
 #ifndef GEOGRAM_BASIC_VECG
 #define GEOGRAM_BASIC_VECG
 
+#include <initializer_list>
 
 #include <iostream>
 #include <cfloat>
@@ -539,6 +553,15 @@ namespace GEO {
             }
         }
 
+        vecng(const std::initializer_list<T>& Vi) {
+            index_t i = 0;
+            for(auto& it: Vi) {
+                geo_debug_assert(i < DIM);
+                data()[i] = it;
+                ++i;
+            }
+        }
+        
         index_t dimension() const {
             return DIM;
         }
@@ -769,6 +792,16 @@ namespace GEO {
         }
 
         
+        vecng(const std::initializer_list<T>& Vi) {
+            index_t i = 0;
+            for(auto& it: Vi) {
+                geo_debug_assert(i < dim);
+                data()[i] = it;
+                ++i;
+            }
+        }
+        
+        
         inline T length2() const {
             return x * x + y * y;
         }
@@ -875,6 +908,12 @@ namespace GEO {
         }
 
         
+        void optimize() {
+            Numeric::optimize_number_representation(x);
+            Numeric::optimize_number_representation(y);
+        }
+        
+        
         T x;
         
         T y;
@@ -917,9 +956,9 @@ namespace GEO {
 
         
         vecng() :
-            x(0),
-            y(0),
-            z(0) {
+            x(T(0.0)),
+            y(T(0.0)),
+            z(T(0.0)) {
         }
 
         vecng(T x_in, T y_in, T z_in) :
@@ -944,6 +983,16 @@ namespace GEO {
             z(v[2]) {
         }
 
+        
+        vecng(const std::initializer_list<T>& Vi) {
+            index_t i = 0;
+            for(auto& it: Vi) {
+                geo_debug_assert(i < dim);
+                data()[i] = it;
+                ++i;
+            }
+        }
+        
         
         inline T length2() const {
             return x * x + y * y + z * z;
@@ -1056,6 +1105,13 @@ namespace GEO {
         }
 
         
+        void optimize() {
+            Numeric::optimize_number_representation(x);
+            Numeric::optimize_number_representation(y);
+            Numeric::optimize_number_representation(z);
+        }
+        
+        
         T x;
         
         T y;
@@ -1075,9 +1131,9 @@ namespace GEO {
         const vecng<3, T>& v1, const vecng<3, T>& v2
     ) {
         return vecng<3, T>(
-            v1.y * v2.z - v1.z * v2.y,
-            v1.z * v2.x - v1.x * v2.z,
-            v1.x * v2.y - v1.y * v2.x
+            det2x2(v1.y, v2.y, v1.z, v2.z),
+            det2x2(v1.z, v2.z, v1.x, v2.x),
+            det2x2(v1.x, v2.x, v1.y, v2.y)
         );
     }
 
@@ -1135,6 +1191,16 @@ namespace GEO {
             w(v[3]) {
         }
 
+        
+        vecng(const std::initializer_list<T>& Vi) {
+            index_t i = 0;
+            for(auto& it: Vi) {
+                geo_debug_assert(i < dim);
+                data()[i] = it;
+                ++i;
+            }
+        }
+        
         
         inline T length2() const {
             return x * x + y * y + z * z + w * w;
@@ -1296,6 +1362,29 @@ namespace GEO {
         }
         return in;
     }
+
+    
+
+    namespace Numeric {
+        
+        template<class T> 
+        inline void optimize_number_representation(
+            vecng<2,T>& v
+        ) {
+            v.optimize();
+        }
+
+        template<class T>
+        inline void optimize_number_representation(
+            vecng<3,T>& v
+        ) {
+            v.optimize();
+        }
+        
+    }
+
+    
+    
 }
 
 #endif
@@ -1306,54 +1395,12 @@ namespace GEO {
 #ifndef GEOGRAM_BASIC_MATRIX
 #define GEOGRAM_BASIC_MATRIX
 
+#include <initializer_list>
 
 
 namespace GEO {
 
     
-
-    template <class T>
-    inline T det2x2(
-        const T& a11, const T& a12,                    
-        const T& a21, const T& a22
-    ) {                                 
-        return a11*a22-a12*a21 ;
-    }
-
-    template <class T>    
-    inline T det3x3(
-        const T& a11, const T& a12, const T& a13,                
-        const T& a21, const T& a22, const T& a23,                
-        const T& a31, const T& a32, const T& a33
-    ) {
-    return
-         a11*det2x2(a22,a23,a32,a33)   
-        -a21*det2x2(a12,a13,a32,a33)   
-        +a31*det2x2(a12,a13,a22,a23);
-    }   
-
-
-    template <class T>    
-    inline T det4x4(
-        const T& a11, const T& a12, const T& a13, const T& a14,
-        const T& a21, const T& a22, const T& a23, const T& a24,               
-        const T& a31, const T& a32, const T& a33, const T& a34,  
-        const T& a41, const T& a42, const T& a43, const T& a44  
-    ) {
-        T m12 = a21*a12 - a11*a22;
-        T m13 = a31*a12 - a11*a32;
-        T m14 = a41*a12 - a11*a42;
-        T m23 = a31*a22 - a21*a32;
-        T m24 = a41*a22 - a21*a42;
-        T m34 = a41*a32 - a31*a42;
-
-        T m123 = m23*a13 - m13*a23 + m12*a33;
-        T m124 = m24*a13 - m14*a23 + m12*a43;
-        T m134 = m34*a13 - m14*a33 + m13*a43;
-        T m234 = m34*a23 - m24*a33 + m23*a43;
-        
-        return (m234*a14 - m134*a24 + m124*a34 - m123*a44);
-    }   
 
 
     template <index_t DIM, class FT>
@@ -1380,6 +1427,21 @@ namespace GEO {
                 }
             }
         }
+
+        Matrix(const std::initializer_list< std::initializer_list<FT> >& Mi) {
+            index_t i = 0;
+            for(auto& it: Mi) {
+                index_t j = 0;
+                for(auto& jt: it) {
+                    geo_debug_assert(i < DIM);
+                    geo_debug_assert(j < DIM);
+                    coeff_[i][j] = jt;
+                    ++j;
+                }
+                ++i;
+            }
+        }
+
         
         inline index_t dimension() const {
             return DIM;
@@ -1808,6 +1870,21 @@ namespace GEO {
                 (capa + 1) * sizeof(double);
         }
 
+        static size_t bytes_on_stack(index_t capa) {
+#ifndef GEO_HAS_BIG_STACK
+            // Note: standard predicates need at least 512, hence the min.
+            // index_t(MAX_CAPACITY_ON_STACK) is necessary, else with
+            // MAX_CAPACITY_ON_STACK alone the compiler tries to generate a
+            // reference to NOT_IN_LIST resulting in a link error.
+            // (weird, even with constexpr, I do not understand...)
+            // Probably when the function excepts a *reference*
+            geo_debug_assert(
+                capa <= std::max(index_t(MAX_CAPACITY_ON_STACK),index_t(512))
+            );
+#endif
+            return bytes(capa);
+        }
+        
         expansion(index_t capa) :
             length_(0),
             capacity_(capa) {
@@ -1820,7 +1897,7 @@ namespace GEO {
     expansion& new_expansion_on_stack(index_t capa);         
 #else
 #define new_expansion_on_stack(capa)                           \
-    (new (alloca(expansion::bytes(capa)))expansion(capa))
+    (new (alloca(expansion::bytes_on_stack(capa)))expansion(capa))
 #endif
 
         static expansion* new_expansion_on_heap(index_t capa);
@@ -1834,7 +1911,24 @@ namespace GEO {
 	    x_[0] = a;
 	    return *this;
 	}
-	
+
+	expansion& assign(const expansion& rhs) {
+            geo_debug_assert(capacity() >= rhs.length());
+	    set_length(rhs.length());
+            for(index_t i=0; i<rhs.length(); ++i) {
+                x_[i] = rhs.x_[i];
+            }
+	    return *this;
+	}
+
+        expansion& assign_abs(const expansion& rhs) {
+            assign(rhs);
+            if(sign() == NEGATIVE) {
+                negate();
+            }
+            return *this;
+        }
+        
         static index_t sum_capacity(double a, double b) {
             geo_argused(a);
             geo_argused(b);
@@ -2120,6 +2214,8 @@ namespace GEO {
         }
 
         void optimize();
+
+        static void show_all_stats();
         
     protected:
         static index_t sub_product_capacity(
@@ -2132,17 +2228,17 @@ namespace GEO {
             const double* a, index_t a_length, const expansion& b
         );
 
-#define expansion_sub_product(a, a_length, b)           \
-    new_expansion_on_stack(                       \
-        sub_product_capacity(a_length, b.length()) \
-    )->assign_sub_product(a, a_length, b)
+        expansion(const expansion& rhs) = delete;
+
+        expansion& operator= (const expansion& rhs) = delete;
 
     private:
-        expansion(const expansion& rhs);
 
-        expansion& operator= (const expansion& rhs);
-
-    private:
+#ifdef GEO_OS_APPLE
+        static constexpr index_t MAX_CAPACITY_ON_STACK = 256;
+#else    
+        static constexpr index_t MAX_CAPACITY_ON_STACK = 1024;
+#endif
         index_t length_;
         index_t capacity_;
         double x_[2];  // x_ is in fact of size [capacity_]
@@ -2155,6 +2251,9 @@ namespace GEO {
 #define expansion_create(a)	      \
     new_expansion_on_stack(1)->assign(a)
 
+
+#define expansion_abs(e)	      \
+    new_expansion_on_stack(e.length())->assign_abs(e)
     
 #define expansion_sum(a, b)            \
     new_expansion_on_stack(           \
@@ -2291,23 +2390,10 @@ namespace {
 
     using namespace GEO;
 
-    
-    
-    bool expansion_length_stat_ = false;
+#ifdef PCK_STATS    
     std::vector<index_t> expansion_length_histo_;
-
-    class ExpansionStatsDisplay {
-    public:
-        ~ExpansionStatsDisplay() {
-            for(index_t i = 0; i < expansion_length_histo_.size(); ++i) {
-                std::cerr << "expansion len " << i
-                    << " : " << expansion_length_histo_[i] << std::endl;
-            }
-        }
-    };
-
-    ExpansionStatsDisplay expansion_stats_display_;
-
+#endif
+    
     
 
     class Pools {
@@ -2542,6 +2628,49 @@ namespace {
         two_sum(_m, _k, x[7], x[6]);
 #endif
     }
+
+    // [Shewchuk 97]
+    // (https://people.eecs.berkeley.edu/~jrs/papers/robustr.pdf)
+    // Section 2.8: other operations
+    // Compression
+    // Note: when converting the algorithms in Shewchuk's article
+    // into code, indices in the article go from 1 to m, and in the
+    // code they go from 0 to m-1 !!!
+    // /!\ there is a bug in the original article,
+    // line 14 of the algorigthm should be h_top <= q (small q and not capital Q)
+
+    void compress_expansion(expansion& e) {
+        expansion& h = e;
+        
+        index_t m = e.length();
+        double Qnew,q;
+
+        index_t bottom = m-1;        
+        double Q = e[bottom];
+
+        for(int i=int(m)-2; i>=0; --i) {
+            fast_two_sum(Q, e[index_t(i)], Qnew, q);
+            Q = Qnew;
+            if(q != 0.0) {
+                h[bottom] = Q;
+                --bottom;
+                Q = q;
+            }
+        }
+        h[bottom] = Q;
+        
+        index_t top = 0;
+        for(index_t i=bottom+1; i<m; ++i) {
+            fast_two_sum(h[i],Q,Qnew,q);
+            Q = Qnew;
+            if(q != 0) {
+                h[top] = q;
+                ++top;
+            }
+        }
+        h[top] = Q;
+        h.set_length(top+1);
+    }    
 }
 
 namespace GEO {
@@ -2774,6 +2903,7 @@ namespace GEO {
         }
         h.set_length(hindex);
     }
+
 }
 
 
@@ -2814,12 +2944,12 @@ namespace GEO {
     
     expansion* expansion::new_expansion_on_heap(index_t capa) {
 	Process::acquire_spinlock(expansions_lock);
-        if(expansion_length_stat_) {
+#ifdef PCK_STATS
             if(capa >= expansion_length_histo_.size()) {
                 expansion_length_histo_.resize(capa + 1);
             }
             expansion_length_histo_[capa]++;
-        }
+#endif            
         Memory::pointer addr = Memory::pointer(
             pools_.malloc(expansion::bytes(capa))
         );
@@ -2906,13 +3036,42 @@ namespace GEO {
         } else {
             // "Distillation" (see Shewchuk's paper) is computed recursively,
             // by splitting the list of expansions to sum into two halves.
+            
             const double* a1 = a;
             index_t a1_length = a_length / 2;
             const double* a2 = a1 + a1_length;
             index_t a2_length = a_length - a1_length;
-            expansion& a1b = expansion_sub_product(a1, a1_length, b);
-            expansion& a2b = expansion_sub_product(a2, a2_length, b);
-            this->assign_sum(a1b, a2b);
+
+            // Allocate both halves on the stack or on the heap if too large
+            // (some platformes, e.g. MacOSX, have a small stack)
+            
+            index_t a1b_capa = sub_product_capacity(a1_length, b.length());
+            index_t a2b_capa = sub_product_capacity(a2_length, b.length());
+
+            bool a1b_on_heap = (a1b_capa > MAX_CAPACITY_ON_STACK);
+            bool a2b_on_heap = (a2b_capa > MAX_CAPACITY_ON_STACK);
+
+            expansion* a1b = a1b_on_heap ?
+                new_expansion_on_heap(a1b_capa) :
+                new_expansion_on_stack(a1b_capa);
+
+            a1b->assign_sub_product(a1, a1_length, b);
+            
+            expansion* a2b = a2b_on_heap ?
+                new_expansion_on_heap(a2b_capa) :
+                new_expansion_on_stack(a2b_capa);
+
+            a2b->assign_sub_product(a2, a2_length, b);
+            
+            this->assign_sum(*a1b, *a2b);
+
+            if(a1b_on_heap) {
+                delete_expansion_on_heap(a1b);
+            }
+
+            if(a2b_on_heap) {
+                delete_expansion_on_heap(a2b);
+            }
         }
         return *this;
     }
@@ -2935,25 +3094,85 @@ namespace GEO {
             two_two_product(a.data(), b.data(), x_);
             set_length(8);
         } else {
-            // Recursive distillation: the shortest expansion
-            // is split into two parts.
-            if(a.length() < b.length()) {
-                const double* a1 = a.data();
-                index_t a1_length = a.length() / 2;
-                const double* a2 = a1 + a1_length;
-                index_t a2_length = a.length() - a1_length;
-                expansion& a1b = expansion_sub_product(a1, a1_length, b);
-                expansion& a2b = expansion_sub_product(a2, a2_length, b);
-                this->assign_sum(a1b, a2b);
-            } else {
-                const double* b1 = b.data();
-                index_t b1_length = b.length() / 2;
-                const double* b2 = b1 + b1_length;
-                index_t b2_length = b.length() - b1_length;
-                expansion& ab1 = expansion_sub_product(b1, b1_length, a);
-                expansion& ab2 = expansion_sub_product(b2, b2_length, a);
-                this->assign_sum(ab1, ab2);
+            
+            
+            const expansion* pa = &a;
+            const expansion* pb = &b;
+
+            if(pa->length() > pb->length()) {
+                std::swap(pa, pb);
             }
+
+            // [Shewchuk 97]
+            // (https://people.eecs.berkeley.edu/~jrs/papers/robustr.pdf)
+            // Section 2.8: other operations
+            // Distillation: sum of k values.
+            //    Worst case: 1/2*k*(k-1)
+            //    But O(k log(k)) if the "summing tree" is well balanced
+            //      and using fast_expansion_sum().
+            // Recommended way of computing a product:
+            //    compute a1*b, a2*b ... ak*b using scale_expansion_zeroelim()
+            //    sum them using a well-balanced tree
+            // However, there is an extra cost for the recursion (and more
+            // importantly, for allocating the intermediary sums, especially
+            // when they do not fit on the stack). So when there are less than
+            // 16 values to add, we simply accumulate them.
+
+            bool use_balanced_distillation = (pa->length() >= 16);
+
+            if(use_balanced_distillation) {
+                // assign_sub_product() is a recursive function that
+                // creates a balanced distillation tree on the stack.
+                assign_sub_product(pa->data(), pa->length(),*pb);
+            } else {
+                // trivial implementation: compute all the products
+                // P = ak*b and accumulate them into S
+
+                index_t P_capa = product_capacity(*pb, 3.0); // 3.0, or any
+                                                             // number that is
+                                                             // not a power of 2
+                
+                index_t S_capa = capacity(); // same capacity as this,
+                                             // enough to store sum.
+            
+                bool P_on_heap = (P_capa > MAX_CAPACITY_ON_STACK);
+                bool S_on_heap = (S_capa > MAX_CAPACITY_ON_STACK);
+            
+                expansion* P = P_on_heap ?
+                    new_expansion_on_heap(P_capa) :
+                    new_expansion_on_stack(P_capa);
+
+                expansion* S = S_on_heap ?
+                    new_expansion_on_heap(S_capa) :
+                    new_expansion_on_stack(S_capa);
+
+                expansion* S1 = S;
+                expansion* S2 = this;
+                
+                if((pa->length()%2) == 0) { 
+                    std::swap(S1,S2);
+                }
+
+                for(index_t i=0; i<pa->length(); ++i) {
+                    if(i == 0) {
+                        S2->assign_product(*pb, (*pa)[i]);
+                    } else {
+                        P->assign_product(*pb, (*pa)[i]);
+                        S2->assign_sum(*S1,*P);
+                    }
+                    std::swap(S1,S2);
+                }
+                
+                geo_assert(S1 == this);
+
+                if(S_on_heap) {
+                    delete_expansion_on_heap(S);
+                }
+
+                if(P_on_heap) {
+                    delete_expansion_on_heap(P);
+                }
+            } 
         }
         return *this;
     }
@@ -3102,24 +3321,79 @@ namespace GEO {
     }
 
     Sign expansion::compare(const expansion& rhs) const {
+        // Fast path: different signs or both zero
+        Sign s1 = sign();
+        Sign s2 = rhs.sign();
+        if(s1 == ZERO && s2 == ZERO) {
+            return ZERO;
+        }
+        if(s1 != s2) {
+            return (int(s1) > int(s2) ? POSITIVE : NEGATIVE);
+        }
+
+        // Fast path: same internal representation
         if(is_same_as(rhs)) {
             return ZERO;
+        }
+
+        // Compute difference and return sign of difference
+        index_t capa = diff_capacity(*this, rhs);
+        if(capa > MAX_CAPACITY_ON_STACK) {
+            expansion* d = new_expansion_on_heap(capa);
+            d->assign_diff(*this, rhs);
+            Sign result = d->sign();
+            delete_expansion_on_heap(d);
+            return result;
         }
         const expansion& d = expansion_diff(*this, rhs);
         return d.sign();
     }
     
     Sign expansion::compare(double rhs) const {
-        if(rhs == 0.0) {
-            return sign();
+        // Fast path: different signs or both zero
+        Sign s1 = sign();
+        Sign s2 = geo_sgn(rhs);
+        if(s1 == ZERO && s2 == ZERO) {
+            return ZERO;
         }
+        if(s1 != s2) {
+            return (int(s1) > int(s2) ? POSITIVE : NEGATIVE);
+        }
+
+        // Fast path: same internal representation
         if(is_same_as(rhs)) {
             return ZERO;
+        }
+
+        // Compute difference and return sign of difference
+        index_t capa = diff_capacity(*this, rhs);
+        if(capa > MAX_CAPACITY_ON_STACK) {
+            expansion* d = new_expansion_on_heap(capa);
+            d->assign_diff(*this, rhs);
+            Sign result = d->sign();
+            delete_expansion_on_heap(d);
+            return result;
         }
         const expansion& d = expansion_diff(*this, rhs);
         return d.sign();
     }
     
+
+
+
+    void expansion::show_all_stats() {
+#ifdef PCK_STATS        
+        Logger::out("expansion") << "Stats" << std::endl;
+        for(index_t i = 0; i < expansion_length_histo_.size(); ++i) {
+            if(expansion_length_histo_[i] != 0) {
+                Logger::out("expansion")
+                    << "len " << i
+                    << " : " << expansion_length_histo_[i] << std::endl;
+            }
+        }
+#endif        
+    }
+
     
     
     Sign sign_of_expansion_determinant(
@@ -3215,7 +3489,7 @@ namespace GEO {
     
 
     void expansion::optimize() {
-        grow_expansion_zeroelim(*this, 0.0, *this);
+        compress_expansion(*this); 
     }
 
     
@@ -11552,6 +11826,102 @@ inline int aligned_3d_filter( const double* p0, const double* p1, const double* 
     return ((((int_tmp_result == 0) && (int_tmp_result_FFWKCAA == 0)) && (int_tmp_result_k60Ocge == 0)) ? 0 : 1);
 } 
 
+/******* extracted from PCK.cpp *******/
+
+#include <vector>
+#include <algorithm>
+
+namespace {
+    using namespace GEO;
+
+#ifdef PCK_STATS
+    inline double percent(Numeric::int64 a, Numeric::int64 b) {
+        return 100.0 * double(a) / double(b);
+    }
+#endif
+    
+}
+
+namespace GEO {
+    namespace PCK {
+
+#ifdef PCK_STATS
+        
+        PredicateStats* PredicateStats::first_ = nullptr;
+        
+        PredicateStats::PredicateStats(
+            const char* name
+        ) : next_(first_),
+            name_(name),
+            invoke_count_(0),
+            exact_count_(0),
+            SOS_count_(0) {
+            first_ = this;
+        }
+
+        void PredicateStats::show_all_stats() {
+            std::vector<PredicateStats*> all_stats;
+            for(
+                PredicateStats* stats = first_;
+                stats != nullptr; stats = stats->next_) {
+                all_stats.push_back(stats);
+            }
+            std::sort(
+                all_stats.begin(), all_stats.end(),
+                [](const PredicateStats* a, const PredicateStats* b)->bool {
+                    return (a->invoke_count_ > b->invoke_count_);
+                }
+            );
+            for(PredicateStats* stats : all_stats) {
+                stats->show_stats();
+            }
+        }
+
+        void PredicateStats::show_stats() {
+
+            if(invoke_count_ == 0) {
+                return;
+            }
+            
+            Logger::out("PCK stats") << "Predicate stats for: "
+                                     << name_ << std::endl;
+            
+            Logger::out("PCK stats") 
+                << String::format("   invocations : %12ld",
+                                  Numeric::int64(invoke_count_))
+                << std::endl;
+
+            Numeric::int64 filter_hit_count = invoke_count_ - exact_count_;
+            
+            Logger::out("PCK stats")
+                << String::format("    filter hit : %12ld (%3.2f %%)",
+                                  Numeric::int64(filter_hit_count),
+                                  percent(filter_hit_count, invoke_count_)
+                                 )
+                << std::endl;
+
+            Logger::out("PCK stats")
+                << String::format("         exact : %12ld (%3.2f %%)",
+                                  Numeric::int64(exact_count_),
+                                  percent(exact_count_, invoke_count_)
+                                 )
+                << std::endl;
+            
+            if(SOS_count_ != 0 || strstr(name_, "SOS") != nullptr) {
+                Logger::out("PCK stats")                
+                << String::format("           SOS : %12ld (%3.2f %%)",
+                                  Numeric::int64(SOS_count_),
+                                  percent(SOS_count_, invoke_count_)
+                                 )
+                << std::endl;
+            }
+            Logger::out("PCK stats") << std::endl;               
+        }
+#endif
+        
+    }
+}
+
 /******* extracted from predicates.cpp *******/
 
 
@@ -11571,11 +11941,6 @@ inline int aligned_3d_filter( const double* p0, const double* p1, const double* 
 #include <emmintrin.h>
 #endif
 
-#ifdef PCK_STATS
-#define PCK_STAT(x) x
-#else
-#define PCK_STAT(x)
-#endif
 
 namespace {
 
@@ -11620,7 +11985,9 @@ namespace {
 	return x[2] < y[2];
     }
 
-    void SOS_sort(const double** begin, const double** end, index_t dim) {
+    void GEOGRAM_API SOS_sort(
+        const double** begin, const double** end, index_t dim
+    ) {
 	if(SOS_mode_ == PCK::SOS_ADDRESS) {
 	    std::sort(begin, end);
 	} else {
@@ -11631,7 +11998,7 @@ namespace {
 	    }
 	}
     }
-
+    
     inline double max4(double x1, double x2, double x3, double x4) {
 #ifdef __SSE2__
 	double result;
@@ -11746,64 +12113,16 @@ namespace {
 
     using namespace GEO;
 
-#ifdef PCK_STATS    
-    index_t cnt_side1_total = 0;
-    index_t cnt_side1_exact = 0;
-    index_t cnt_side1_SOS = 0;
-    index_t len_side1 = 0;
-
-    index_t cnt_side2_total = 0;
-    index_t cnt_side2_exact = 0;
-    index_t cnt_side2_SOS = 0;
-    index_t len_side2_num = 0;
-    index_t len_side2_denom = 0;
-    index_t len_side2_SOS = 0;
-
-    index_t cnt_side3_total = 0;
-    index_t cnt_side3_exact = 0;
-    index_t cnt_side3_SOS = 0;
-    index_t len_side3_num = 0;
-    index_t len_side3_denom = 0;
-    index_t len_side3_SOS = 0;
-
-    index_t cnt_side3h_total = 0;
-    index_t cnt_side3h_exact = 0;
-    index_t cnt_side3h_SOS = 0;
-    index_t len_side3h_num = 0;
-    index_t len_side3h_denom = 0;
-    index_t len_side3h_SOS = 0;
-    
-    index_t cnt_side4_total = 0;
-    index_t cnt_side4_exact = 0;
-    index_t cnt_side4_SOS = 0;
-    index_t len_side4_num = 0;
-    index_t len_side4_denom = 0;
-    index_t len_side4_SOS = 0;
-
-    index_t cnt_orient2d_total = 0;
-    index_t cnt_orient2d_exact = 0;
-    index_t len_orient2d = 0;
-
-    index_t cnt_orient3d_total = 0;
-    index_t cnt_orient3d_exact = 0;
-    index_t len_orient3d = 0;
-
-    index_t cnt_orient3dh_total = 0;
-    index_t cnt_orient3dh_exact = 0;
-    index_t cnt_orient3dh_SOS = 0;
-    index_t len_orient3dh_num = 0;
-    index_t len_orient3dh_denom = 0;
-    index_t len_orient3dh_SOS = 0;
-
-
-    index_t cnt_det4d_total = 0;
-    index_t cnt_det4d_exact = 0;
-    index_t len_det4d = 0;
-
-    index_t cnt_det3d_total = 0;
-    index_t cnt_det3d_exact = 0;
-    index_t len_det3d = 0;
-#endif
+    PCK::PredicateStats stats_side1("side1");
+    PCK::PredicateStats stats_side2("side2");
+    PCK::PredicateStats stats_side3("side3");
+    PCK::PredicateStats stats_side3h("side3h");
+    PCK::PredicateStats stats_side4("side4/insphere");
+    PCK::PredicateStats stats_orient2d("orient2d");
+    PCK::PredicateStats stats_orient3d("orient3d");
+    PCK::PredicateStats stats_orient3dh("orient3dh");
+    PCK::PredicateStats stats_det3d("det3d");
+    PCK::PredicateStats stats_det4d("det4d");
     
     // ================= side1 =========================================
 
@@ -11812,17 +12131,16 @@ namespace {
         const double* q0,
         coord_index_t dim
     ) {
-        PCK_STAT(cnt_side1_exact++);
+        stats_side1.log_exact();
         expansion& l = expansion_sq_dist(p0, p1, dim);
         expansion& a = expansion_dot_at(p1, q0, p0, dim).scale_fast(2.0);
         expansion& r = expansion_diff(l, a);
         Sign r_sign = r.sign();
         // Symbolic perturbation, Simulation of Simplicity
         if(r_sign == ZERO) {
-            PCK_STAT(cnt_side1_SOS++);
+            stats_side1.log_SOS();
             return (p0 < p1) ? POSITIVE : NEGATIVE;
         }
-        PCK_STAT(len_side1 = std::max(len_side1, r.length()));
         return r_sign;
     }
 
@@ -11883,7 +12201,7 @@ namespace {
         const double* q0, const double* q1,
         coord_index_t dim
     ) {
-        PCK_STAT(cnt_side2_exact++);
+        stats_side2.log_exact();
 
         const expansion& l1 = expansion_sq_dist(p1, p0, dim);
         const expansion& l2 = expansion_sq_dist(p2, p0, dim);
@@ -11916,13 +12234,10 @@ namespace {
 
         Sign r_sign = r.sign();
 
-        // Statistics
-        PCK_STAT(len_side2_num = std::max(len_side2_num, r.length()));
-        PCK_STAT(len_side2_denom = std::max(len_side2_denom, Delta.length()));
-
         // Simulation of Simplicity (symbolic perturbation)
         if(r_sign == ZERO) {
-            PCK_STAT(cnt_side2_SOS++);
+            stats_side2.log_SOS();
+
             const double* p_sort[3];
             p_sort[0] = p0;
             p_sort[1] = p1;
@@ -11935,7 +12250,6 @@ namespace {
                     const expansion& z1 = expansion_diff(Delta, a21);
                     const expansion& z = expansion_sum(z1, a20);
                     Sign z_sign = z.sign();
-                    PCK_STAT(len_side2_SOS = std::max(len_side2_SOS, z.length()));
                     if(z_sign != ZERO) {
                         return Sign(Delta_sign * z_sign);
                     }
@@ -11943,7 +12257,6 @@ namespace {
                 if(p_sort[i] == p1) {
                     const expansion& z = expansion_diff(a21, a20);
                     Sign z_sign = z.sign();
-                    PCK_STAT(len_side2_SOS = std::max(len_side2_SOS, z.length()));
                     if(z_sign != ZERO) {
                         return Sign(Delta_sign * z_sign);
                     }
@@ -12020,7 +12333,7 @@ namespace {
         const double* q0, const double* q1, const double* q2,
         coord_index_t dim
     ) {
-        PCK_STAT(cnt_side3_exact++);
+        stats_side3.log_exact();
 
         const expansion& l1 = expansion_sq_dist(p1, p0, dim);
         const expansion& l2 = expansion_sq_dist(p2, p0, dim);
@@ -12082,13 +12395,10 @@ namespace {
         const expansion& r = expansion_sum4(r0, r1, r2, r3);
         Sign r_sign = r.sign();
 
-        // Statistics
-        PCK_STAT(len_side3_num = std::max(len_side3_num, r.length()));
-        PCK_STAT(len_side3_denom = std::max(len_side3_denom, Delta.length()));
-
         // Simulation of Simplicity (symbolic perturbation)
         if(r_sign == ZERO) {
-            PCK_STAT(cnt_side3_SOS++);
+            stats_side3.log_SOS();
+
             const double* p_sort[4];
             p_sort[0] = p0;
             p_sort[1] = p1;
@@ -12105,7 +12415,6 @@ namespace {
                     const expansion& z3 = expansion_product(a32, z3_0).negate();
                     const expansion& z = expansion_sum4(Delta, z1, z2, z3);
                     Sign z_sign = z.sign();
-                    PCK_STAT(len_side3_SOS = std::max(len_side3_SOS, z.length()));
                     if(z_sign != ZERO) {
                         return Sign(Delta_sign * z_sign);
                     }
@@ -12115,7 +12424,6 @@ namespace {
                     const expansion& z3 = expansion_product(a32, b21);
                     const expansion& z = expansion_sum3(z1, z2, z3);
                     Sign z_sign = z.sign();
-                    PCK_STAT(len_side3_SOS = std::max(len_side3_SOS, z.length()));
                     if(z_sign != ZERO) {
                         return Sign(Delta_sign * z_sign);
                     }
@@ -12125,7 +12433,6 @@ namespace {
                     const expansion& z3 = expansion_product(a32, b22);
                     const expansion& z = expansion_sum3(z1, z2, z3);
                     Sign z_sign = z.sign();
-                    PCK_STAT(len_side3_SOS = std::max(len_side3_SOS, z.length()));
                     if(z_sign != ZERO) {
                         return Sign(Delta_sign * z_sign);
                     }
@@ -12144,7 +12451,7 @@ namespace {
         double h0, double h1, double h2, double h3,
         const double* q0, const double* q1, const double* q2
     ) {
-        PCK_STAT(cnt_side3h_exact++);
+        stats_side3h.log_exact();
 
         const expansion& l1 = expansion_diff(h1,h0);
         const expansion& l2 = expansion_diff(h2,h0);
@@ -12206,13 +12513,10 @@ namespace {
         const expansion& r = expansion_sum4(r0, r1, r2, r3);
         Sign r_sign = r.sign();
 
-        // Statistics
-        PCK_STAT(len_side3h_num = std::max(len_side3h_num, r.length()));
-        PCK_STAT(len_side3h_denom = std::max(len_side3h_denom, Delta.length()));
-
         // Simulation of Simplicity (symbolic perturbation)
         if(r_sign == ZERO) {
-            PCK_STAT(cnt_side3h_SOS++);
+            stats_side3h.log_SOS();
+
             const double* p_sort[4];
             p_sort[0] = p0;
             p_sort[1] = p1;
@@ -12230,7 +12534,6 @@ namespace {
                     const expansion& z3 = expansion_product(a32, z3_0).negate();
                     const expansion& z = expansion_sum4(Delta, z1, z2, z3);
                     Sign z_sign = z.sign();
-                    PCK_STAT(len_side3h_SOS = std::max(len_side3h_SOS, z.length()));
                     if(z_sign != ZERO) {
                         return Sign(Delta_sign * z_sign);
                     }
@@ -12240,7 +12543,6 @@ namespace {
                     const expansion& z3 = expansion_product(a32, b21);
                     const expansion& z = expansion_sum3(z1, z2, z3);
                     Sign z_sign = z.sign();
-                    PCK_STAT(len_side3h_SOS = std::max(len_side3h_SOS, z.length()));
                     if(z_sign != ZERO) {
                         return Sign(Delta_sign * z_sign);
                     }
@@ -12250,7 +12552,6 @@ namespace {
                     const expansion& z3 = expansion_product(a32, b22);
                     const expansion& z = expansion_sum3(z1, z2, z3);
                     Sign z_sign = z.sign();
-                    PCK_STAT(len_side3h_SOS = std::max(len_side3h_SOS, z.length()));
                     if(z_sign != ZERO) {
                         return Sign(Delta_sign * z_sign);
                     }
@@ -12326,7 +12627,7 @@ namespace {
         const double* p0, const double* p1, const double* p2, const double* p3,
         const double* p4, bool sos = true
     ) {
-        PCK_STAT(cnt_side4_exact++);
+        stats_side4.log_exact();
 
         const expansion& a11 = expansion_diff(p1[0], p0[0]);
         const expansion& a12 = expansion_diff(p1[1], p0[1]);
@@ -12414,13 +12715,10 @@ namespace {
         const expansion& r = expansion_sum4(r_1, r_2, r_3, r_4);
         Sign r_sign = r.sign();
 
-        // Statistics
-        PCK_STAT(len_side4_num = std::max(len_side4_num, r.length()));
-        PCK_STAT(len_side4_denom = std::max(len_side4_denom, Delta1.length()));
-
         // Simulation of Simplicity (symbolic perturbation)
         if(sos && r_sign == ZERO) {
-            PCK_STAT(cnt_side4_SOS++);
+            stats_side4.log_SOS();
+            
             const double* p_sort[5];
             p_sort[0] = p0;
             p_sort[1] = p1;
@@ -12434,26 +12732,22 @@ namespace {
                     const expansion& z2 = expansion_diff(Delta4, Delta3);
                     const expansion& z = expansion_sum(z1, z2);
                     Sign z_sign = z.sign();
-                    PCK_STAT(len_side4_SOS = std::max(len_side4_SOS, z.length()));
                     if(z_sign != ZERO) {
                         return Sign(Delta4_sign * z_sign);
                     }
                 } else if(p_sort[i] == p1) {
                     Sign Delta1_sign = Delta1.sign();
                     if(Delta1_sign != ZERO) {
-                        PCK_STAT(len_side4_SOS = std::max(len_side4_SOS, Delta1.length()));
                         return Sign(Delta4_sign * Delta1_sign);
                     }
                 } else if(p_sort[i] == p2) {
                     Sign Delta2_sign = Delta2.sign();
                     if(Delta2_sign != ZERO) {
-                        PCK_STAT(len_side4_SOS = std::max(len_side4_SOS, Delta2.length()));
                         return Sign(-Delta4_sign * Delta2_sign);
                     }
                 } else if(p_sort[i] == p3) {
                     Sign Delta3_sign = Delta3.sign();
                     if(Delta3_sign != ZERO) {
-                        PCK_STAT(len_side4_SOS = std::max(len_side4_SOS, Delta3.length()));
                         return Sign(Delta4_sign * Delta3_sign);
                     }
                 } else if(p_sort[i] == p4) {
@@ -12470,7 +12764,7 @@ namespace {
         const double* q0, const double* q1, const double* q2, const double* q3,
         coord_index_t dim
     ) {
-        PCK_STAT(cnt_side4_exact++);
+        stats_side4.log_exact();
 
         const expansion& l1 = expansion_sq_dist(p1, p0, dim);
         const expansion& l2 = expansion_sq_dist(p2, p0, dim);
@@ -12573,7 +12867,8 @@ namespace {
 
         // Simulation of Simplicity (symbolic perturbation)
         if(r_sign == ZERO) {
-            PCK_STAT(cnt_side4_SOS++);
+            stats_side4.log_SOS();
+
             const double* p_sort[5];
             p_sort[0] = p0;
             p_sort[1] = p1;
@@ -12594,7 +12889,6 @@ namespace {
                     const expansion& z1234 = expansion_sum4(z1, z2, z3, z4);
                     const expansion& z = expansion_diff(Delta, z1234);
                     Sign z_sign = z.sign();
-                    PCK_STAT(len_side4_SOS = std::max(len_side4_SOS, z.length()));
                     if(z_sign != ZERO) {
                         return Sign(Delta_sign * z_sign);
                     }
@@ -12605,7 +12899,6 @@ namespace {
                     const expansion& z4 = expansion_product(a33, b31);
                     const expansion& z = expansion_sum4(z1, z2, z3, z4);
                     Sign z_sign = z.sign();
-                    PCK_STAT(len_side4_SOS = std::max(len_side4_SOS, z.length()));
                     if(z_sign != ZERO) {
                         return Sign(Delta_sign * z_sign);
                     }
@@ -12616,7 +12909,6 @@ namespace {
                     const expansion& z4 = expansion_product(a33, b32);
                     const expansion& z = expansion_sum4(z1, z2, z3, z4);
                     Sign z_sign = z.sign();
-                    PCK_STAT(len_side4_SOS = std::max(len_side4_SOS, z.length()));
                     if(z_sign != ZERO) {
                         return Sign(Delta_sign * z_sign);
                     }
@@ -12627,7 +12919,6 @@ namespace {
                     const expansion& z4 = expansion_product(a33, b33);
                     const expansion& z = expansion_sum4(z1, z2, z3, z4);
                     Sign z_sign = z.sign();
-                    PCK_STAT(len_side4_SOS = std::max(len_side4_SOS, z.length()));
                     if(z_sign != ZERO) {
                         return Sign(Delta_sign * z_sign);
                     }
@@ -12693,7 +12984,7 @@ namespace {
     Sign orient_2d_exact(
         const double* p0, const double* p1, const double* p2
     ) {
-        PCK_STAT(cnt_orient2d_exact++);
+        stats_orient2d.log_exact();
 
         const expansion& a11 = expansion_diff(p1[0], p0[0]);
         const expansion& a12 = expansion_diff(p1[1], p0[1]);
@@ -12705,8 +12996,6 @@ namespace {
             a11, a12, a21, a22
         );
 
-        PCK_STAT(len_orient2d = std::max(len_orient2d, Delta.length()));
-
         return Delta.sign();
     }
 
@@ -12717,7 +13006,7 @@ namespace {
         const double* p0, const double* p1,
         const double* p2, const double* p3
     ) {
-        PCK_STAT(cnt_orient3d_exact++);
+        stats_orient3d.log_exact();
 
         const expansion& a11 = expansion_diff(p1[0], p0[0]);
         const expansion& a12 = expansion_diff(p1[1], p0[1]);
@@ -12735,8 +13024,6 @@ namespace {
             a11, a12, a13, a21, a22, a23, a31, a32, a33
         );
 
-        PCK_STAT(len_orient3d = std::max(len_orient3d, Delta.length()));
-
         return Delta.sign();
     }
 
@@ -12746,7 +13033,7 @@ namespace {
         double h0, double h1, double h2, double h3, double h4,
         bool sos = true
     ) {
-        PCK_STAT(cnt_orient3dh_exact++);
+        stats_orient3dh.log_exact();
 
         const expansion& a11 = expansion_diff(p1[0], p0[0]);
         const expansion& a12 = expansion_diff(p1[1], p0[1]);
@@ -12803,13 +13090,9 @@ namespace {
 
         Sign r_sign = r.sign();
 
-        // Statistics
-        PCK_STAT(len_orient3dh_num = std::max(len_orient3dh_num, r.length()));
-        PCK_STAT(len_orient3dh_denom = std::max(len_orient3dh_denom, Delta1.length()));
-
         // Simulation of Simplicity (symbolic perturbation)
         if(sos && r_sign == ZERO) {
-            PCK_STAT(cnt_orient3dh_SOS++);
+            stats_orient3dh.log_SOS();
             const double* p_sort[5];
             p_sort[0] = p0;
             p_sort[1] = p1;
@@ -12824,26 +13107,22 @@ namespace {
                     const expansion& z2 = expansion_diff(Delta4, Delta3);
                     const expansion& z = expansion_sum(z1, z2);
                     Sign z_sign = z.sign();
-                    PCK_STAT(len_orient3dh_SOS = std::max(len_orient3dh_SOS, z.length()));
                     if(z_sign != ZERO) {
                         return Sign(Delta4_sign * z_sign);
                     }
                 } else if(p_sort[i] == p1) {
                     Sign Delta1_sign = Delta1.sign();
                     if(Delta1_sign != ZERO) {
-                        PCK_STAT(len_orient3dh_SOS = std::max(len_orient3dh_SOS, Delta1.length()));
                         return Sign(Delta4_sign * Delta1_sign);
                     }
                 } else if(p_sort[i] == p2) {
                     Sign Delta2_sign = Delta2.sign();
                     if(Delta2_sign != ZERO) {
-                        PCK_STAT(len_orient3dh_SOS = std::max(len_orient3dh_SOS, Delta2.length()));
                         return Sign(-Delta4_sign * Delta2_sign);
                     }
                 } else if(p_sort[i] == p3) {
                     Sign Delta3_sign = Delta3.sign();
                     if(Delta3_sign != ZERO) {
-                        PCK_STAT(len_orient3dh_SOS = std::max(len_orient3dh_SOS, Delta3.length()));
                         return Sign(Delta4_sign * Delta3_sign);
                     }
                 } else if(p_sort[i] == p4) {
@@ -12904,7 +13183,7 @@ namespace {
             p_sort[1] = p1;
             p_sort[2] = p2;
             p_sort[3] = p3;
-            SOS_sort(p_sort, p_sort + 4, 3);
+            SOS_sort(p_sort, p_sort + 4, 2);
             for(index_t i = 0; i < 4; ++i) {
                 if(p_sort[i] == p0) {
                     const expansion& z1 = expansion_diff(Delta2, Delta1);
@@ -12937,7 +13216,7 @@ namespace {
     Sign det_3d_exact(
 	const double* p0, const double* p1, const double* p2
     ) {
-        PCK_STAT(cnt_det3d_exact++);
+        stats_det3d.log_exact();
 	
 	const expansion& p0_0 = expansion_create(p0[0]);
 	const expansion& p0_1 = expansion_create(p0[1]);
@@ -12956,8 +13235,6 @@ namespace {
 	    p1_0, p1_1, p1_2,
 	    p2_0, p2_1, p2_2
 	);
-	
-        PCK_STAT(len_det3d = std::max(len_det3d, Delta.length()));
 	
 	return Delta.sign();
     }
@@ -13024,71 +13301,6 @@ namespace {
 	
 	return result.sign();
     }
-    
-    // ================================ statistics ========================
-
-#ifdef PCK_STATS    
-    inline double percent(index_t a, index_t b) {
-        if(a == 0 && b == 0) {
-            return 0;
-        }
-        return double(a) * 100.0 / double(b);
-    }
-
-    void show_stats_plain(
-        const std::string& name, index_t cnt1, index_t cnt2
-    ) {
-        Logger::out(name)
-            << "Tot:" << cnt1
-            << " Exact:" << cnt2
-            << std::endl;
-        Logger::out(name)
-            << " Exact: " << percent(cnt2, cnt1) << "% "
-            << std::endl;
-    }
-
-    void show_stats_sos(
-        const std::string& name, index_t cnt1, index_t cnt2, index_t cnt3
-    ) {
-        Logger::out(name)
-            << "Tot:" << cnt1
-            << " Exact:" << cnt2
-            << " SOS:" << cnt3 << std::endl;
-        Logger::out(name)
-            << " Exact: " << percent(cnt2, cnt1) << "% "
-            << " SOS: " << percent(cnt3, cnt1) << "% "
-            << std::endl;
-    }
-
-    void show_stats_sos(
-        const std::string& name, index_t cnt1, index_t cnt2, index_t cnt3,
-        index_t len
-    ) {
-        show_stats_sos(name, cnt1, cnt2, cnt3);
-        Logger::out(name) << " Len: " << len << std::endl;
-    }
-
-    void show_stats_plain(
-        const std::string& name, index_t cnt1, index_t cnt2,
-        index_t len
-    ) {
-        show_stats_plain(name, cnt1, cnt2);
-        Logger::out(name) << " Len: " << len << std::endl;
-    }
-
-    void show_stats_sos(
-        const std::string& name, index_t cnt1, index_t cnt2, index_t cnt3,
-        index_t num_len, index_t denom_len, index_t SOS_len
-    ) {
-        show_stats_sos(name, cnt1, cnt2, cnt3);
-        Logger::out(name)
-            << " Num len: " << num_len
-            << " Denom len: " << denom_len
-            << " SOS len: " << SOS_len
-            << std::endl;
-    }
-#endif
-    
 }
 
 
@@ -13111,7 +13323,7 @@ namespace GEO {
             const double* q0,
             coord_index_t DIM
         ) {
-            PCK_STAT(cnt_side1_total++);
+            stats_side1.log_invoke();
             switch(DIM) {
             case 3:
                 return side1_3d_SOS(p0, p1, q0);
@@ -13132,7 +13344,7 @@ namespace GEO {
             const double* q0, const double* q1,
             coord_index_t DIM
         ) {
-            PCK_STAT(cnt_side2_total++);
+            stats_side2.log_invoke();
             switch(DIM) {
             case 3:
                 return side2_3d_SOS(p0, p1, p2, q0, q1);
@@ -13154,7 +13366,7 @@ namespace GEO {
             const double* q0, const double* q1, const double* q2,
             coord_index_t DIM
         ) {
-            PCK_STAT(cnt_side3_total++);
+            stats_side3.log_invoke();
             switch(DIM) {
             case 3:
                 return side3_3d_SOS(p0, p1, p2, p3, q0, q1, q2);
@@ -13207,16 +13419,16 @@ namespace GEO {
                 // incremented in side4_3d_SOS().
                 return side4_3d_SOS(p0, p1, p2, p3, p4);
             case 4:
-                PCK_STAT(cnt_side4_total++);
+                stats_side4.log_invoke();
                 return side4_4d_SOS(p0, p1, p2, p3, p4, q0, q1, q2, q3);
             case 6:
-                PCK_STAT(cnt_side4_total++);
+                stats_side4.log_invoke();
                 return side4_6d_SOS(p0, p1, p2, p3, p4, q0, q1, q2, q3);
             case 7:
-                PCK_STAT(cnt_side4_total++);
+                stats_side4.log_invoke();
                 return side4_7d_SOS(p0, p1, p2, p3, p4, q0, q1, q2, q3);
             case 8:
-                PCK_STAT(cnt_side4_total++);
+                stats_side4.log_invoke();
                 return side4_8d_SOS(p0, p1, p2, p3, p4, q0, q1, q2, q3);
             }
             geo_assert_not_reached;
@@ -13227,7 +13439,7 @@ namespace GEO {
             const double* p0, const double* p1, const double* p2,
 	    const double* p3, const double* p4
         ) {
-            PCK_STAT(cnt_side4_total++);
+            stats_side4.log_invoke();
             Sign result = Sign(side4_3d_filter(p0, p1, p2, p3, p4));
             if(result == 0) {
                 // last argument is false: do not apply symbolic perturbation
@@ -13241,7 +13453,7 @@ namespace GEO {
             const double* p2, const double* p3,
             const double* p4
         ) {
-            PCK_STAT(cnt_side4_total++);
+            stats_side4.log_invoke();
             Sign result = Sign(side4_3d_filter(p0, p1, p2, p3, p4));
             if(result == 0) {
                 result = side4_3d_exact_SOS(p0, p1, p2, p3, p4);
@@ -13268,7 +13480,7 @@ namespace GEO {
             // Therefore:
             // in_sphere_3d(p0,p1,p2,p3,p4) = -side4_3d(p0,p1,p2,p3,p4)
 
-            PCK_STAT(cnt_side4_total++);
+            stats_side4.log_invoke();
             
             // This specialized filter supposes that orient_3d(p0,p1,p2,p3) > 0
 
@@ -13344,14 +13556,13 @@ namespace GEO {
         Sign orient_2d(
             const double* p0, const double* p1, const double* p2
         ) {
-            PCK_STAT(cnt_orient2d_total++);
+            stats_orient2d.log_invoke();
             Sign result = Sign(orient_2d_filter(p0, p1, p2));
             if(result == 0) {
                 result = orient_2d_exact(p0, p1, p2);
             }
             return result;
         }
-
 
         Sign orient_2dlifted_SOS(
             const double* p0, const double* p1,
@@ -13377,8 +13588,8 @@ namespace GEO {
         Sign orient_3d(
             const double* p0, const double* p1,
             const double* p2, const double* p3
-            ) {
-            PCK_STAT(cnt_orient3d_total++);
+        ) {
+            stats_orient3d.log_invoke();
             Sign result = Sign(orient_3d_filter(p0, p1, p2, p3));
             if(result == 0) {
                 result = orient_3d_exact(p0, p1, p2, p3);
@@ -13392,7 +13603,7 @@ namespace GEO {
             const double* p2, const double* p3, const double* p4,
             double h0, double h1, double h2, double h3, double h4
         ) {
-            PCK_STAT(cnt_orient3dh_total++);
+            stats_orient3dh.log_invoke();
             Sign result = Sign(
                 side4h_3d_filter(
                     p0, p1, p2, p3, p4, h0, h1, h2, h3, h4
@@ -13414,7 +13625,7 @@ namespace GEO {
             const double* p2, const double* p3, const double* p4,
             double h0, double h1, double h2, double h3, double h4
         ) {
-            PCK_STAT(cnt_orient3dh_total++);
+            stats_orient3dh.log_invoke();
             Sign result = Sign(
                 side4h_3d_filter(
                     p0, p1, p2, p3, p4, h0, h1, h2, h3, h4
@@ -13433,7 +13644,7 @@ namespace GEO {
 	Sign det_3d(
 	    const double* p0, const double* p1, const double* p2
 	) {
-            PCK_STAT(cnt_det3d_total++);	  
+            stats_det3d.log_invoke();
 	    Sign result = Sign(
 		det_3d_filter(p0, p1, p2)
 	    );
@@ -13448,13 +13659,13 @@ namespace GEO {
 	    const double* p0, const double* p1,
 	    const double* p2, const double* p3
 	) {
-            PCK_STAT(cnt_det4d_total++);	  	  
+            stats_det4d.log_invoke();
 	    Sign result = Sign(
 		det_4d_filter(p0, p1, p2, p3)
 	    );
 
 	    if(result == 0) {
-	        PCK_STAT(cnt_det4d_exact++);
+                stats_det4d.log_exact();
 		
 		const expansion& p0_0 = expansion_create(p0[0]);
 		const expansion& p0_1 = expansion_create(p0[1]);
@@ -13610,64 +13821,10 @@ namespace GEO {
         void terminate() {
             // Nothing to do.
         }
-
+        
         void show_stats() {
-#ifdef PCK_STATS
-            show_stats_plain(
-                "orient2d",
-                cnt_orient2d_total, cnt_orient2d_exact,
-                len_orient2d
-            );
-            show_stats_plain(
-                "orient3d",
-                cnt_orient3d_total, cnt_orient3d_exact,
-                len_orient3d
-            );
-            show_stats_sos(
-                "orient3dh",
-                cnt_orient3dh_total, cnt_orient3dh_exact, cnt_orient3dh_SOS,
-                len_orient3dh_num, len_orient3dh_denom, len_orient3dh_SOS
-            );
-            show_stats_sos(
-                "side1",
-                cnt_side1_total, cnt_side1_exact, cnt_side1_SOS,
-                len_side1
-            );
-            show_stats_sos(
-                "side2",
-                cnt_side2_total, cnt_side2_exact, cnt_side2_SOS,
-                len_side2_num, len_side2_denom, len_side2_SOS
-            );
-            show_stats_sos(
-                "side3",
-                cnt_side3_total, cnt_side3_exact, cnt_side3_SOS,
-                len_side3_num, len_side3_denom, len_side3_SOS
-            );
-            show_stats_sos(
-                "side3h",
-                cnt_side3h_total, cnt_side3h_exact, cnt_side3h_SOS,
-                len_side3h_num, len_side3h_denom, len_side3h_SOS
-            );
-            show_stats_sos(
-                "side4/insph.",
-                cnt_side4_total, cnt_side4_exact, cnt_side4_SOS,
-                len_side4_num, len_side4_denom, len_side4_SOS
-            );
-            show_stats_plain(
-                "det3d",
-                cnt_det3d_total, cnt_det3d_exact,
-                len_det3d
-            );
-            show_stats_plain(
-                "det4d",
-                cnt_det4d_total, cnt_det4d_exact,
-                len_det4d
-            );
-#else
-	    Logger::out("PCK") << "No stats available." << std::endl;
-	    Logger::out("PCK") << "Define PCK_STATS in predicates.h to get them."
-			       << std::endl;
-#endif	    
+            PredicateStats::show_all_stats();
+            expansion::show_all_stats();
         }
     }
 }
