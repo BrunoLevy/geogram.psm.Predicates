@@ -436,12 +436,12 @@ namespace GEO {
         }
 
         T& operator[] (unsigned int i) {
-            geo_debug_assert(i >= 0 && index_t(i) < size());
+            geo_debug_assert(index_t(i) < size());
             return baseclass::operator[] (index_t(i));
         }
 
         const T& operator[] (unsigned int i) const {
-            geo_debug_assert(i >= 0 && index_t(i) < size());
+            geo_debug_assert(index_t(i) < size());
             return baseclass::operator[] (index_t(i));
         }
 #endif	
@@ -2515,6 +2515,8 @@ namespace {
         two_one_sum(_j, _0, b1, x3, x2, x1);
     }
 
+#ifndef FP_FAST_FMA
+    
     inline void two_product_presplit(
         double a, double b, double bhi, double blo, double& x, double& y
     ) {
@@ -2540,6 +2542,8 @@ namespace {
         y = (alo * blo) - err3;
     }
 
+#endif
+    
     inline void two_square(
         double a1, double a0,
         double* x
