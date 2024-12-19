@@ -17,7 +17,7 @@
  *  * Neither the name of the ALICE Project-Team nor the names of its
  *  contributors may be used to endorse or promote products derived from this
  *  software without specific prior written permission.
- * 
+ *
  *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  *  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  *  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -69,24 +69,24 @@
  */
 #if defined(__clang__)
 #pragma clang diagnostic ignored "-Wunknown-pragmas"
-#pragma clang diagnostic ignored "-Wdocumentation-unknown-command" 
+#pragma clang diagnostic ignored "-Wdocumentation-unknown-command"
 #endif
 
 
 #if defined(GEO_DYNAMIC_LIBS)
-   #if defined(_MSC_VER)
-      #define GEO_IMPORT __declspec(dllimport) 
-      #define GEO_EXPORT __declspec(dllexport) 
-   #elif defined(__GNUC__)
-      #define GEO_IMPORT  
-      #define GEO_EXPORT __attribute__ ((visibility("default")))
-   #else
-      #define GEO_IMPORT
-      #define GEO_EXPORT
-   #endif
+#if defined(_MSC_VER)
+#define GEO_IMPORT __declspec(dllimport)
+#define GEO_EXPORT __declspec(dllexport)
+#elif defined(__GNUC__)
+#define GEO_IMPORT
+#define GEO_EXPORT __attribute__ ((visibility("default")))
 #else
-   #define GEO_IMPORT
-   #define GEO_EXPORT
+#define GEO_IMPORT
+#define GEO_EXPORT
+#endif
+#else
+#define GEO_IMPORT
+#define GEO_EXPORT
 #endif
 
 #ifdef geogram_EXPORTS
@@ -102,9 +102,9 @@ typedef int GeoMesh;
 
 typedef unsigned char geo_coord_index_t;
 
-/* 
- * If GARGANTUA is defined, then geogram is compiled 
- * with 64 bit indices. 
+/*
+ * If GARGANTUA is defined, then geogram is compiled
+ * with 64 bit indices.
  */
 #ifdef GARGANTUA
 
@@ -133,7 +133,6 @@ enum {
 
 #endif
 
-
 /******* extracted from ../basic/common.h *******/
 
 #ifndef GEOGRAM_BASIC_COMMON
@@ -149,11 +148,27 @@ enum {
 namespace GEO {
 
     enum {
-	GEOGRAM_NO_HANDLER = 0,
-	GEOGRAM_INSTALL_HANDLERS = 1
+        /// Do not install error handlers
+        GEOGRAM_INSTALL_NONE = 0,
+        /// Install Geogram's signal handlers
+        GEOGRAM_INSTALL_HANDLERS = 1,
+        /// Sets the locale to POSIX
+        GEOGRAM_INSTALL_LOCALE = 2,
+        /// Reset errno to 0
+        GEOGRAM_INSTALL_ERRNO = 4,
+        /// Enable or disable FPE during initialization
+        GEOGRAM_INSTALL_FPE = 8,
+        /// Enable global citation database
+        GEOGRAM_INSTALL_BIBLIO = 16,
+        /// Install everything
+        GEOGRAM_INSTALL_ALL = GEOGRAM_INSTALL_HANDLERS
+        | GEOGRAM_INSTALL_LOCALE
+        | GEOGRAM_INSTALL_ERRNO
+        | GEOGRAM_INSTALL_FPE
+        | GEOGRAM_INSTALL_BIBLIO
     };
-    
-    void GEOGRAM_API initialize(int flags = GEOGRAM_INSTALL_HANDLERS);
+
+    void GEOGRAM_API initialize(int flags = GEOGRAM_INSTALL_NONE);
 
     void GEOGRAM_API terminate();
 }
@@ -268,9 +283,9 @@ namespace GEO {
 #error "Unsupported operating system"
 #endif
 
-#if defined(GEO_COMPILER_GCC)   || \
-    defined(GEO_COMPILER_CLANG) || \
-    defined(GEO_COMPILER_MINGW) || \
+#if defined(GEO_COMPILER_GCC)   ||              \
+    defined(GEO_COMPILER_CLANG) ||              \
+    defined(GEO_COMPILER_MINGW) ||              \
     defined(GEO_COMPILER_EMSCRIPTEN)
 #define GEO_COMPILER_GCC_FAMILY
 #endif
@@ -291,19 +306,19 @@ namespace GEO {
 
 #if defined(GOMGEN)
 #define GEO_NORETURN
-#elif defined(GEO_COMPILER_GCC_FAMILY) || \
-      defined(GEO_COMPILER_INTEL) 
+#elif defined(GEO_COMPILER_GCC_FAMILY) ||       \
+    defined(GEO_COMPILER_INTEL)
 #define GEO_NORETURN __attribute__((noreturn))
 #else
 #define GEO_NORETURN
 #endif
 
 #if defined(GOMGEN)
-#define GEO_NORETURN_DECL 
+#define GEO_NORETURN_DECL
 #elif defined(GEO_COMPILER_MSVC)
 #define GEO_NORETURN_DECL __declspec(noreturn)
 #else
-#define GEO_NORETURN_DECL 
+#define GEO_NORETURN_DECL
 #endif
 
 #if defined(GEO_COMPILER_CLANG) || defined(GEO_COMPILER_EMSCRIPTEN)
@@ -312,8 +327,8 @@ namespace GEO {
 #endif
 #endif
 
-// For Graphite GOM generator (swig is confused by throw() specifier) 
-#ifdef GOMGEN 
+// For Graphite GOM generator (swig is confused by throw() specifier)
+#ifdef GOMGEN
 #define GEO_NOEXCEPT
 #endif
 
@@ -332,7 +347,6 @@ namespace GEO {
 
 #endif
 
-
 /******* extracted from ../basic/argused.h *******/
 
 #ifndef GEOGRAM_BASIC_ARGUSED
@@ -348,7 +362,6 @@ namespace GEO {
 }
 
 #endif
-
 
 /******* extracted from ../basic/numeric.h *******/
 
@@ -389,7 +402,7 @@ namespace GEO {
     inline Sign geo_cmp(const T& a, const T& b) {
         return Sign((a > b) * POSITIVE + (a < b) * NEGATIVE);
     }
-    
+
     namespace Numeric {
 
         
@@ -472,7 +485,7 @@ namespace GEO {
         };
 
         template <class T>
-        struct Limits : 
+        struct Limits :
             LimitsHelper<T, std::numeric_limits<T>::is_specialized> {
         };
 
@@ -529,18 +542,17 @@ namespace GEO {
     typedef geo_coord_index_t coord_index_t;
 
     inline double round(double x) {
-	return ((x - floor(x)) > 0.5 ? ceil(x) : floor(x));
+        return ((x - floor(x)) > 0.5 ? ceil(x) : floor(x));
     }
 
     
-    
+
     static constexpr index_t NO_INDEX = index_t(-1);
-    
+
     
 }
 
 #endif
-
 
 /******* extracted from ../basic/psm.h *******/
 
@@ -559,22 +571,22 @@ namespace GEO {
 #ifndef GEOGRAM_BASIC_ASSERT
 
 #define geo_assert(x) assert(x)
-#define geo_range_assert(x, min_val, max_val) \
+#define geo_range_assert(x, min_val, max_val)           \
     assert((x) >= (min_val) && (x) <= (max_val))
 #define geo_assert_not_reached assert(0)
 
 #ifdef GEO_DEBUG
 #define geo_debug_assert(x) assert(x)
-#define geo_debug_range_assert(x, min_val, max_val) \
+#define geo_debug_range_assert(x, min_val, max_val)     \
     assert((x) >= (min_val) && (x) <= (max_val))
 #else
-#define geo_debug_assert(x) 
+#define geo_debug_assert(x)
 #define geo_debug_range_assert(x, min_val, max_val)
 #endif
 
 #ifdef GEO_PARANOID
 #define geo_parano_assert(x) geo_assert(x)
-#define geo_parano_range_assert(x, min_val, max_val) \
+#define geo_parano_range_assert(x, min_val, max_val)    \
     geo_range_assert(x, min_val, max_val)
 #else
 #define geo_parano_assert(x)
@@ -607,7 +619,7 @@ namespace GEO {
             return std::cerr << "W[" << name << "]";
         }
     }
-    
+
 }
 
 #endif
@@ -693,7 +705,7 @@ namespace GEO {
             _WriteBarrier(); // prevents compiler reordering
             x = 0;
         }
-        
+
     }
 }
 
@@ -711,7 +723,7 @@ namespace GEO {
         // - we are using C++17
         // - the Windows implementation that uses integers rather than
         //   std::atomic_flag needs an initialization value.
-#define GEOGRAM_SPINLOCK_INIT ATOMIC_FLAG_INIT 
+#define GEOGRAM_SPINLOCK_INIT ATOMIC_FLAG_INIT
 
         typedef std::atomic_flag spinlock;
 
@@ -722,17 +734,17 @@ namespace GEO {
                 }
 // If compiling in C++20 we can be slightly more efficient when spinning
 // (avoid unrequired atomic operations, just "peek" the flag)
-#if defined(__cpp_lib_atomic_flag_test)                
-                while (x.test(std::memory_order_relaxed)) 
+#if defined(__cpp_lib_atomic_flag_test)
+                while (x.test(std::memory_order_relaxed))
 #endif
                     geo_pause();
-            }            
+            }
         }
 
         inline void release_spinlock(volatile spinlock& x) {
-            x.clear(std::memory_order_release); 
+            x.clear(std::memory_order_release);
         }
-        
+
     }
 }
 #endif
@@ -741,7 +753,7 @@ namespace GEO {
 
 namespace GEO {
     namespace Process {
-    
+
         class BasicSpinLockArray {
         public:
             BasicSpinLockArray() : spinlocks_(nullptr), size_(0) {
@@ -756,7 +768,7 @@ namespace GEO {
             BasicSpinLockArray& operator=(
                 const BasicSpinLockArray& rhs
             ) = delete;
-            
+
             void resize(index_t size_in) {
                 delete[] spinlocks_;
                 spinlocks_ = new spinlock[size_in];
@@ -813,13 +825,13 @@ namespace GEO {
             ~CompactSpinLockArray() {
                 clear();
             }
-            
+
             CompactSpinLockArray(const CompactSpinLockArray& rhs) = delete;
 
             CompactSpinLockArray& operator=(
                 const CompactSpinLockArray& rhs
             ) = delete;
-            
+
             void resize(index_t size_in) {
                 if(size_ != size_in) {
                     size_ = size_in;
@@ -836,14 +848,14 @@ namespace GEO {
                 }
 // Test at compile time that we are using atomic uint32_t operations (and not
 // using an additional lock which would be catastrophic in terms of performance)
-#ifdef __cpp_lib_atomic_is_always_lock_free                
+#ifdef __cpp_lib_atomic_is_always_lock_free
                 static_assert(std::atomic<uint32_t>::is_always_lock_free);
 #else
 // If we cannot test that at compile time, we test that at runtime in debug
 // mode (so that we will be notified in the non-regression test if one of
 // the platforms has the problem, which is very unlikely though...)
                 geo_debug_assert(size_ == 0 || spinlocks_[0].is_lock_free());
-#endif                
+#endif
             }
 
             index_t size() const {
@@ -883,7 +895,7 @@ namespace GEO {
             std::atomic<uint32_t>* spinlocks_;
             index_t size_;
         };
-        
+
     }
 }
 
@@ -899,7 +911,6 @@ namespace GEO {
 
 #endif
 
-
 /******* extracted from ../basic/determinant.h *******/
 
 #ifndef GEOGRAM_BASIC_DETERMINANT
@@ -913,31 +924,31 @@ namespace GEO {
 
     template <class T>
     inline T det2x2(
-        const T& a11, const T& a12,                    
+        const T& a11, const T& a12,
         const T& a21, const T& a22
-    ) {                                 
+    ) {
         return a11*a22-a12*a21 ;
     }
 
-    template <class T>    
+    template <class T>
     inline T det3x3(
-        const T& a11, const T& a12, const T& a13,                
-        const T& a21, const T& a22, const T& a23,                
+        const T& a11, const T& a12, const T& a13,
+        const T& a21, const T& a22, const T& a23,
         const T& a31, const T& a32, const T& a33
     ) {
-    return
-         a11*det2x2(a22,a23,a32,a33)   
-        -a21*det2x2(a12,a13,a32,a33)   
-        +a31*det2x2(a12,a13,a22,a23);
-    }   
+        return
+            a11*det2x2(a22,a23,a32,a33)
+            -a21*det2x2(a12,a13,a32,a33)
+            +a31*det2x2(a12,a13,a22,a23);
+    }
 
 
-    template <class T>    
+    template <class T>
     inline T det4x4(
         const T& a11, const T& a12, const T& a13, const T& a14,
-        const T& a21, const T& a22, const T& a23, const T& a24,               
-        const T& a31, const T& a32, const T& a33, const T& a34,  
-        const T& a41, const T& a42, const T& a43, const T& a44  
+        const T& a21, const T& a22, const T& a23, const T& a24,
+        const T& a31, const T& a32, const T& a33, const T& a34,
+        const T& a41, const T& a42, const T& a43, const T& a44
     ) {
         T m12 = a21*a12 - a11*a22;
         T m13 = a31*a12 - a11*a32;
@@ -950,9 +961,9 @@ namespace GEO {
         T m124 = m24*a13 - m14*a23 + m12*a43;
         T m134 = m34*a13 - m14*a33 + m13*a43;
         T m234 = m34*a23 - m24*a33 + m23*a43;
-        
+
         return (m234*a14 - m134*a24 + m124*a34 - m123*a44);
-    }   
+    }
 }
 
 #endif
@@ -978,29 +989,29 @@ namespace GEO {
 
     namespace PCK {
 
-        
+
 #ifdef PCK_STATS
         class GEOGRAM_API PredicateStats {
         public:
-            PredicateStats(const char* name);
-            void log_invoke() {
-                ++invoke_count_;
-            }
-            void log_exact() {
-                ++exact_count_;
-            }
-            void log_SOS() {
-                ++SOS_count_;
-            }
-            void show_stats();
-            static void show_all_stats();
+        PredicateStats(const char* name);
+        void log_invoke() {
+            ++invoke_count_;
+        }
+        void log_exact() {
+            ++exact_count_;
+        }
+        void log_SOS() {
+            ++SOS_count_;
+        }
+        void show_stats();
+        static void show_all_stats();
         private:
-            static PredicateStats* first_;
-            PredicateStats* next_;
-            const char* name_;
-            std::atomic<Numeric::int64> invoke_count_;
-            std::atomic<Numeric::int64> exact_count_;
-            std::atomic<Numeric::int64> SOS_count_;
+        static PredicateStats* first_;
+        PredicateStats* next_;
+        const char* name_;
+        std::atomic<Numeric::int64> invoke_count_;
+        std::atomic<Numeric::int64> exact_count_;
+        std::atomic<Numeric::int64> SOS_count_;
         };
 #else
         class PredicateStats {
@@ -1021,7 +1032,7 @@ namespace GEO {
         };
 #endif
 
-        
+
 #define SOS_result(x) [&]()->Sign { return Sign(x); }
 
         template <
@@ -1089,12 +1100,12 @@ namespace GEO {
 
     namespace PCK {
 
-	enum SOSMode { SOS_ADDRESS, SOS_LEXICO };
+        enum SOSMode { SOS_ADDRESS, SOS_LEXICO };
 
-	void GEOGRAM_API set_SOS_mode(SOSMode m);
+        void GEOGRAM_API set_SOS_mode(SOSMode m);
 
-	SOSMode GEOGRAM_API get_SOS_mode();
-	
+        SOSMode GEOGRAM_API get_SOS_mode();
+
         Sign GEOGRAM_API side1_SOS(
             const double* p0, const double* p1,
             const double* q0,
@@ -1108,20 +1119,20 @@ namespace GEO {
         );
 
         Sign GEOGRAM_API side3_SOS(
-            const double* p0, const double* p1, 
+            const double* p0, const double* p1,
             const double* p2, const double* p3,
             const double* q0, const double* q1, const double* q2,
             coord_index_t DIM
         );
 
         Sign GEOGRAM_API side3_3dlifted_SOS(
-            const double* p0, const double* p1, 
+            const double* p0, const double* p1,
             const double* p2, const double* p3,
             double h0, double h1, double h2, double h3,
             const double* q0, const double* q1, const double* q2,
-	    bool SOS=true
+            bool SOS=true
         );
-        
+
         Sign GEOGRAM_API side4_SOS(
             const double* p0,
             const double* p1, const double* p2,
@@ -1139,42 +1150,42 @@ namespace GEO {
         );
 
         Sign GEOGRAM_API side4_3d_SOS(
-            const double* p0, const double* p1, 
+            const double* p0, const double* p1,
             const double* p2, const double* p3, const double* p4
         );
-       
-         Sign GEOGRAM_API in_sphere_3d_SOS(
-            const double* p0, const double* p1, 
+
+        Sign GEOGRAM_API in_sphere_3d_SOS(
+            const double* p0, const double* p1,
             const double* p2, const double* p3,
             const double* p4
-         );
+        );
 
 
-         Sign GEOGRAM_API in_circle_2d_SOS(
-             const double* p0, const double* p1, const double* p2,
-             const double* p3
-         );
+        Sign GEOGRAM_API in_circle_2d_SOS(
+            const double* p0, const double* p1, const double* p2,
+            const double* p3
+        );
 
-	 
-         Sign GEOGRAM_API in_circle_3d_SOS(
-             const double* p0, const double* p1, const double* p2,
-             const double* p3
-         );
+
+        Sign GEOGRAM_API in_circle_3d_SOS(
+            const double* p0, const double* p1, const double* p2,
+            const double* p3
+        );
 
 
         Sign GEOGRAM_API in_circle_3dlifted_SOS(
             const double* p0, const double* p1, const double* p2,
             const double* p3,
             double h0, double h1, double h2, double h3,
-	    bool SOS=true
+            bool SOS=true
         );
-        
+
         Sign GEOGRAM_API orient_2d(
             const double* p0, const double* p1, const double* p2
         );
 
 
-#ifndef GEOGRAM_PSM        
+#ifndef GEOGRAM_PSM
         inline Sign orient_2d(
             const vec2& p0, const vec2& p1, const vec2& p2
         ) {
@@ -1184,11 +1195,11 @@ namespace GEO {
 
         Sign GEOGRAM_API orient_2dlifted_SOS(
             const double* p0, const double* p1,
-            const double* p2, const double* p3, 
+            const double* p2, const double* p3,
             double h0, double h1, double h2, double h3
         );
-	
-        
+
+
         Sign GEOGRAM_API orient_3d(
             const double* p0, const double* p1,
             const double* p2, const double* p3
@@ -1203,7 +1214,7 @@ namespace GEO {
             return orient_3d(p0.data(),p1.data(),p2.data(),p3.data());
         }
 #endif
-        
+
         Sign GEOGRAM_API orient_3dlifted(
             const double* p0, const double* p1,
             const double* p2, const double* p3, const double* p4,
@@ -1218,89 +1229,106 @@ namespace GEO {
         );
 
 
-	Sign GEOGRAM_API det_3d(
-	    const double* p0, const double* p1, const double* p2
-	);
+        Sign GEOGRAM_API det_3d(
+            const double* p0, const double* p1, const double* p2
+        );
 
-	Sign GEOGRAM_API det_4d(
-	    const double* p0, const double* p1,
-	    const double* p2, const double* p3
-	);
+#ifndef GEOGRAM_PSM
+        inline Sign det_3d(
+            const vec3& p0, const vec3& p1, const vec3& p2
+        ) {
+	    return det_3d(p0.data(), p1.data(), p2.data());
+	}
+#endif
 
-	Sign GEOGRAM_API det_compare_4d(
-	    const double* p0, const double* p1,
-	    const double* p2, const double* p3,
-	    const double* p4
-	);
-	
-	bool GEOGRAM_API aligned_3d(
-	    const double* p0, const double* p1, const double* p2
-	);
-	
-	Sign GEOGRAM_API dot_3d(
-	    const double* p0, const double* p1, const double* p2
-	);
+        Sign GEOGRAM_API det_4d(
+            const double* p0, const double* p1,
+            const double* p2, const double* p3
+        );
+
+#ifndef GEOGRAM_PSM
+        inline Sign det_4d(
+            const vec4& p0, const vec4& p1,
+            const vec4& p2, const vec4& p3
+        ) {
+	    return det_4d(p0.data(), p1.data(), p2.data(), p3.data());
+	}
+#endif
+
+        Sign GEOGRAM_API det_compare_4d(
+            const double* p0, const double* p1,
+            const double* p2, const double* p3,
+            const double* p4
+        );
+
+        bool GEOGRAM_API aligned_3d(
+            const double* p0, const double* p1, const double* p2
+        );
+
+        Sign GEOGRAM_API dot_3d(
+            const double* p0, const double* p1, const double* p2
+        );
 
 #ifndef GEOGRAM_PSM
 
-	inline bool aligned_3d(
-	    const vec3& p0, const vec3& p1, const vec3& p2
-	) {
+        inline bool aligned_3d(
+            const vec3& p0, const vec3& p1, const vec3& p2
+        ) {
             return aligned_3d(p0.data(), p1.data(), p2.data());
         }
-        
-	inline Sign dot_3d(
-	    const vec3& p0, const vec3& p1, const vec3& p2
-	) {
+
+        inline Sign dot_3d(
+            const vec3& p0, const vec3& p1, const vec3& p2
+        ) {
             return dot_3d(p0.data(), p1.data(), p2.data());
         }
 #endif
-	
-	Sign GEOGRAM_API dot_compare_3d(
-	    const double* v0, const double* v1, const double* v2
-	);
-	
-	bool points_are_identical_2d(
-	    const double* p1,
-	    const double* p2
-	);
-    
-	bool GEOGRAM_API points_are_identical_3d(
-	    const double* p1,
-	    const double* p2
-	);
 
-	bool GEOGRAM_API points_are_colinear_3d(
-	    const double* p1,
-	    const double* p2,
-	    const double* p3
+        Sign GEOGRAM_API dot_compare_3d(
+            const double* v0, const double* v1, const double* v2
         );
 
-	inline Sign orient_3d_inexact(
-	    const double* p0, const double* p1,
-	    const double* p2, const double* p3
-	) {
-	    double a11 = p1[0] - p0[0] ;
-	    double a12 = p1[1] - p0[1] ;
-	    double a13 = p1[2] - p0[2] ;
-	    
-	    double a21 = p2[0] - p0[0] ;
-	    double a22 = p2[1] - p0[1] ;
-	    double a23 = p2[2] - p0[2] ;
-	    
-	    double a31 = p3[0] - p0[0] ;
-	    double a32 = p3[1] - p0[1] ;
-	    double a33 = p3[2] - p0[2] ;
-	    
-	    double Delta = det3x3(
-		a11,a12,a13,
-		a21,a22,a23,
-		a31,a32,a33
-	    );
+        bool points_are_identical_2d(
+            const double* p1,
+            const double* p2
+        );
 
-	    return geo_sgn(Delta);
-	}
-	
+        bool GEOGRAM_API points_are_identical_3d(
+            const double* p1,
+            const double* p2
+        );
+
+        bool GEOGRAM_API points_are_colinear_3d(
+            const double* p1,
+            const double* p2,
+            const double* p3
+        );
+
+        inline Sign orient_3d_inexact(
+            const double* p0, const double* p1,
+            const double* p2, const double* p3
+        ) {
+            double a11 = p1[0] - p0[0] ;
+            double a12 = p1[1] - p0[1] ;
+            double a13 = p1[2] - p0[2] ;
+
+            double a21 = p2[0] - p0[0] ;
+            double a22 = p2[1] - p0[1] ;
+            double a23 = p2[2] - p0[2] ;
+
+            double a31 = p3[0] - p0[0] ;
+            double a32 = p3[1] - p0[1] ;
+            double a33 = p3[2] - p0[2] ;
+
+            double Delta = det3x3(
+                a11,a12,a13,
+                a21,a22,a23,
+                a31,a32,a33
+            );
+
+            return geo_sgn(Delta);
+        }
+
         void GEOGRAM_API show_stats();
 
         void GEOGRAM_API initialize();
@@ -1310,4 +1338,3 @@ namespace GEO {
 }
 
 #endif
-
