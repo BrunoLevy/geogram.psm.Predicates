@@ -878,15 +878,15 @@ namespace GEO {
         
         template <class T2>
         explicit vecng(const vecng<dim, T2>& v) :
-            x(v.x),
-            y(v.y) {
+            x(T(v.x)),
+            y(T(v.y)) {
         }
 
         
         template <class T2>
         explicit vecng(const T2* v) :
-            x(v[0]),
-            y(v[1]) {
+            x(T(v[0])),
+            y(T(v[1])) {
         }
 
         
@@ -1087,17 +1087,17 @@ namespace GEO {
         
         template <class T2>
         explicit vecng(const vecng<dim, T2>& v) :
-            x(v.x),
-            y(v.y),
-            z(v.z) {
+            x(T(v.x)),
+            y(T(v.y)),
+            z(T(v.z)) {
         }
 
         
         template <class T2>
         explicit vecng(const T2* v) :
-            x(v[0]),
-            y(v[1]),
-            z(v[2]) {
+            x(T(v[0])),
+            y(T(v[1])),
+            z(T(v[2])) {
         }
 
         
@@ -1326,19 +1326,19 @@ namespace GEO {
         
         template <class T2>
         explicit vecng(const vecng<dim, T2>& v) :
-            x(v.x),
-            y(v.y),
-            z(v.z),
-            w(v.w) {
+            x(T(v.x)),
+            y(T(v.y)),
+            z(T(v.z)),
+            w(T(v.w)) {
         }
 
         
         template <class T2>
         explicit vecng(const T2* v) :
-            x(v[0]),
-            y(v[1]),
-            z(v[2]),
-            w(v[3]) {
+            x(T(v[0])),
+            y(T(v[1])),
+            z(T(v[2])),
+            w(T(v[3])) {
         }
 
         
@@ -2402,6 +2402,7 @@ namespace GEO {
 
 namespace GEO {
 
+    extern bool expansion_initialized_;
     extern double expansion_splitter_;
     extern double expansion_epsilon_;
 
@@ -2436,6 +2437,7 @@ namespace GEO {
     }
 
     inline void split(double a, double& ahi, double& alo) {
+	geo_debug_assert(expansion_initialized_);
         double c = expansion_splitter_ * a;
         double abig = c - a;
         ahi = c - abig;
@@ -3483,6 +3485,7 @@ namespace GEO {
 
     double expansion_splitter_;
     double expansion_epsilon_;
+    bool expansion_initialized_ = false;
 
     void expansion::initialize() {
         // Taken from Jonathan Shewchuk's exactinit.
@@ -3509,6 +3512,7 @@ namespace GEO {
             check = 1.0 + expansion_epsilon_;
         } while((check != 1.0) && (check != lastcheck));
         expansion_splitter_ += 1.0;
+	expansion_initialized_ = true;
     }
 
     // ====== Initialization from expansion and double ===============
